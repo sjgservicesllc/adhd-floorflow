@@ -941,11 +941,13 @@ window.openLayout=function(i){
   const list=document.getElementById('layoutList'); if(list) list.remove();
 };
 window.deleteLayout=function(i){
-  appConfirm('Delete this layout?',ok=>{ if(!ok) return;
-  const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
-  layouts.splice(i,1);
-  localStorage.setItem('ff_layouts',JSON.stringify(layouts));
-  showLayoutList();
+  appConfirm('Delete this layout?',ok=>{
+    if(!ok) return;
+    const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
+    layouts.splice(i,1);
+    localStorage.setItem('ff_layouts',JSON.stringify(layouts));
+    showLayoutList();
+  });
 };
 
 document.getElementById('exportBtn').onclick=async()=>{
