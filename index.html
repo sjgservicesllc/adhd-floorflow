@@ -75,6 +75,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
     <button id="modeSelect" class="active">Select</button>
     <button id="modeMulti">Multi</button>
     <button id="modeWall">Draw Wall</button>
+    <button id="splitWall">Split Wall</button>
     <button id="modeMeasure">Measure</button>
     <button id="addRoom">+ Room</button>
     <button id="cloneBtn">Clone</button>
@@ -540,7 +541,8 @@ function showProps(){
     </div>
     ${lab?`<label>Label</label><input type="text" value="${lab.textContent}" id="pL">`:''}
     <label style="margin-top:10px"><input type="checkbox" id="pLock" ${locked?'checked':''}> Locked</label>
-    ${el.dataset.type==='wall'?`<button id="addDoorWall" style="margin-top:8px;width:100%;background:#ffaa00;color:#000;border:none;padding:8px;border-radius:6px;cursor:pointer;font-weight:600">Add Door to Wall</button>
+    ${el.dataset.type==='wall'?`<button id="splitThis" style="margin-top:8px;width:100%;background:#aa00ff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Split This Wall</button>
+    <button id="addDoorWall" style="margin-top:6px;width:100%;background:#ffaa00;color:#000;border:none;padding:8px;border-radius:6px;cursor:pointer;font-weight:600">Add Door</button>
     <button id="addWinWall" style="margin-top:6px;width:100%;background:#00aaff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Add Window</button>`:''}
     <button id="del" style="margin-top:12px;width:100%;background:#b91c1c;border:none;padding:8px;color:#fff;border-radius:6px;cursor:pointer">Delete</button>
   `;
@@ -559,6 +561,7 @@ function showProps(){
   if(lab) document.getElementById('pL').onchange=e=>{lab.textContent=e.target.value; saveState();};
   document.getElementById('pLock').onchange=e=>el.classList.toggle('locked',e.target.checked);
   if(el.dataset.type==='wall'){
+    document.getElementById('splitThis').onclick=()=>document.getElementById('splitWall').click();
     document.getElementById('addDoorWall').onclick=()=>addToWall(el,'door');
     document.getElementById('addWinWall').onclick=()=>addToWall(el,'window');
   }
@@ -599,7 +602,20 @@ function applyLayers(){
 // Modes
 document.getElementById('modeSelect').onclick=()=>{mode='select'; setActive('modeSelect'); setStatus('Select mode');};
 document.getElementById('modeMulti').onclick=()=>{mode='multi'; setActive('modeMulti'); setStatus('Multi mode — tap rooms to add to group, then drag any to move all');};
-document.getElementById('modeWall').onclick=()=>{mode='wall'; setActive('modeWall'); setStatus('Click & drag to draw walls · Switch to Select to edit');};
+document.getElementById('splitWall').onclick=()=>{
+  if(!selected||selected.dataset.type!=='wall'){ setStatus('Select a wall first, then Split Wall'); return; }
+  const wall=selected;
+  const len=parseFloat(wall.style.width);
+  const x=parseFloat(wall.style.left);
+  const y=parseFloat(wall.style.top);
+  const thick=parseFloat(wall.style.height);
+  const angle=wall.style.transform||'';
+  const mid=len/2;
+  wall.style.width=mid+'px';
+  const part2=createItem('wall',x+mid,y,mid,thick,'','wall');
+  if(angle) part2.style.transform=angle;
+  setStatus('Wall split — select either piece and Delete to remove just that section');
+};
 document.getElementById('modeMeasure').onclick=()=>{mode='measure'; setActive('modeMeasure'); setStatus('Click two points to measure');};
 function setActive(id){
   document.querySelectorAll('.toolbar button').forEach(b=>b.classList.remove('active'));
