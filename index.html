@@ -78,6 +78,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
     <button id="modeMeasure">Measure</button>
     <button id="addRoom">+ Room</button>
     <button id="cloneBtn">Clone</button>
+    <button id="mergeBtn">Merge</button>
     <button id="shapeL">L-Shape</button>
     <button id="shapeV">V-Shape</button>
     <input id="quickRoom" placeholder="Type size: 12x15 or 144x180" style="width:160px" title="Type width x depth then Enter to create room">
@@ -175,7 +176,37 @@ function fromU(val){
   if(unit==='m') return val/0.3048;
   return val;
 }
-function setStatus(t){statusEl.textContent=t}
+function appConfirm(msg,cb){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center';
+  m.innerHTML=`<div style="background:#0a0a18;border:1px solid #00f0ff50;border-radius:10px;padding:20px;width:300px">
+    <p style="margin:0 0 16px;color:#e0e0ff">${msg}</p>
+    <div style="display:flex;gap:8px"><button id="yes" style="flex:1;padding:10px;background:#00f0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600">Yes</button>
+    <button id="no" style="flex:1;padding:10px;background:transparent;color:#7a7aaa;border:1px solid #3a4050;border-radius:4px;cursor:pointer">No</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#yes').onclick=()=>{m.remove();cb(true);};
+  m.querySelector('#no').onclick=()=>{m.remove();cb(false);};
+}
+function appPrompt(msg,def,cb){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center';
+  m.innerHTML=`<div style="background:#0a0a18;border:1px solid #00f0ff50;border-radius:10px;padding:20px;width:300px">
+    <p style="margin:0 0 10px;color:#e0e0ff">${msg}</p>
+    <input id="val" value="${def||''}" style="width:100%;padding:8px;margin-bottom:12px;background:#0d0d20;border:1px solid #00f0ff40;border-radius:4px;color:#fff">
+    <div style="display:flex;gap:8px"><button id="ok" style="flex:1;padding:10px;background:#00f0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600">OK</button>
+    <button id="cancel" style="flex:1;padding:10px;background:transparent;color:#7a7aaa;border:1px solid #3a4050;border-radius:4px;cursor:pointer">Cancel</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#ok').onclick=()=>{const v=m.querySelector('#val').value;m.remove();cb(v);};
+  m.querySelector('#cancel').onclick=()=>{m.remove();cb(null);};
+}
+function appAlert(msg){
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center';
+  m.innerHTML=`<div style="background:#0a0a18;border:1px solid #00f0ff50;border-radius:10px;padding:20px;width:300px">
+    <p style="margin:0 0 16px;color:#e0e0ff;white-space:pre-line">${msg}</p>
+    <button style="width:100%;padding:10px;background:#00f0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600" onclick="this.closest('div').parentElement.remove()">OK</button></div>`;
+  document.body.appendChild(m);
+}
 
 function saveState(){
   history.push(canvas.innerHTML);
@@ -262,7 +293,7 @@ function bind(el){
     }
     select(el);
     if(el.classList.contains('locked')) return;
-    drag={el, sx:e.clientX, sy:e.clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), multi:[...selectedSet], merged:el.dataset.merged?[...document.querySelectorAll(`.item[data-id="${el.dataset.merged}"], .item[data-merged="${el.dataset.merged}"]`)] : []};
+    drag={el, sx:e.clientX, sy:e.clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), multi:[...selectedSet], merged:el.dataset.merged?[...document.querySelectorAll(`.item[data-merged="${el.dataset.merged}"]`)] : []};
     el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('dblclick',e=>{
@@ -281,6 +312,7 @@ function applyRemovedWalls(el){
   el.style.borderLeft=removed.includes('left')?'none':'';
   el.style.borderRight=removed.includes('right')?'none':'';
 }
+function openConfig(el){
   const old=document.getElementById('configModal'); if(old) old.remove();
   const w=toU(parseFloat(el.style.width));
   const h=toU(parseFloat(el.style.height));
@@ -444,30 +476,33 @@ document.addEventListener('pointerup',()=>{
     const el=drag.el;
     drag=null;
     saveState();
-    if(el.dataset.type==='room') tryMerge(el);
   }
 });
 function tryMerge(el){
   const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
   const w=parseFloat(el.style.width), h=parseFloat(el.style.height);
-  const thresh=scale()*0.5;
+  const thresh=scale()*0.6;
   document.querySelectorAll('.item.room').forEach(o=>{
-    if(o===el) return;
+    if(o===el||o.dataset.merged) return;
     const ox=parseFloat(o.style.left), oy=parseFloat(o.style.top);
     const ow=parseFloat(o.style.width), oh=parseFloat(o.style.height);
-    const sharesEdge=
-      (Math.abs(x-(ox+ow))<thresh && y<oy+oh && y+h>oy) ||
-      (Math.abs((x+w)-ox)<thresh && y<oy+oh && y+h>oy) ||
-      (Math.abs(y-(oy+oh))<thresh && x<ox+ow && x+w>ox) ||
-      (Math.abs((y+h)-oy)<thresh && x<ox+ow && x+w>ox);
-    if(sharesEdge && confirm('Merge these into one room?')){
-      const label=el.querySelector('.label')?.textContent||'Room';
-      o.querySelector('.label').textContent=label;
-      el.dataset.merged=o.dataset.id||'1';
-      o.dataset.merged=el.dataset.id||'1';
+    const shareRight=Math.abs(x-(ox+ow))<thresh && y<oy+oh-10 && y+h>oy+10;
+    const shareLeft=Math.abs((x+w)-ox)<thresh && y<oy+oh-10 && y+h>oy+10;
+    const shareBottom=Math.abs(y-(oy+oh))<thresh && x<ox+ow-10 && x+w>ox+10;
+    const shareTop=Math.abs((y+h)-oy)<thresh && x<ox+ow-10 && x+w>ox+10;
+    if(shareRight||shareLeft||shareBottom||shareTop){
+      const gid='g'+Date.now();
+      el.dataset.merged=gid;
+      o.dataset.merged=gid;
       el.classList.add('merged');
       o.classList.add('merged');
-      setStatus('Merged — drag either piece to move both');
+      if(shareRight){ el.style.borderLeft='none'; o.style.borderRight='none'; }
+      if(shareLeft){ el.style.borderRight='none'; o.style.borderLeft='none'; }
+      if(shareBottom){ el.style.borderTop='none'; o.style.borderBottom='none'; }
+      if(shareTop){ el.style.borderBottom='none'; o.style.borderTop='none'; }
+      const lab=el.querySelector('.label');
+      if(lab) lab.textContent=(lab.textContent||'Room').replace(' copy','');
+      setStatus('Merged into one room — drag either piece');
     }
   });
 }
@@ -671,13 +706,18 @@ document.querySelectorAll('.symbol-btn').forEach(btn=>{
   btn.onclick=()=>{
     const t=btn.dataset.type;
     if(t==='custom'){
-      const name=prompt('Furniture name:','Custom Piece')||'Custom';
-      const w=parseFloat(prompt(`Width (${unit}):`,'48'))||48;
-      const h=parseFloat(prompt(`Depth / Length (${unit}):`,'24'))||24;
-      const feetW=fromU(w), feetH=fromU(h);
-      createItem('furniture',220,220,px(feetW),px(feetH),name,'furniture');
-      setStatus(`Added ${name} ${w}×${h} ${unit}`);
-    } else if(t==='outlet'){
+      appPrompt('Furniture name:','Custom Piece',name=>{
+        if(!name) return;
+        appPrompt(`Width (${unit}):`,'48',w=>{
+          appPrompt(`Depth (${unit}):`,'24',h=>{
+            createItem('furniture',220,220,px(fromU(+w||48)),px(fromU(+h||24)),name,'furniture');
+            setStatus('Added '+name);
+          });
+        });
+      });
+      return;
+    }
+    if(t==='outlet'){
       const el=createItem('outlet',300,300,18,18,'','electrical');
       el.style.width=el.style.height='18px';
     } else {
@@ -690,7 +730,30 @@ document.querySelectorAll('.symbol-btn').forEach(btn=>{
 });
 
 document.getElementById('addRoom').onclick=()=>createItem('room',100,100,px(14),px(12),'Room','room');
-document.getElementById('cloneBtn').onclick=()=>{
+document.getElementById('mergeBtn').onclick=()=>{
+  if(!selected||selected.dataset.type!=='room'){ setStatus('Select a room first, then click Merge'); return; }
+  const el=selected;
+  const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
+  const w=parseFloat(el.style.width), h=parseFloat(el.style.height);
+  const thresh=scale()*0.8;
+  let found=null;
+  document.querySelectorAll('.item.room').forEach(o=>{
+    if(o===el||found) return;
+    const ox=parseFloat(o.style.left), oy=parseFloat(o.style.top);
+    const ow=parseFloat(o.style.width), oh=parseFloat(o.style.height);
+    const near=Math.abs(x-(ox+ow))<thresh||Math.abs((x+w)-ox)<thresh||Math.abs(y-(oy+oh))<thresh||Math.abs((y+h)-oy)<thresh;
+    if(near) found=o;
+  });
+  if(!found){ setStatus('No nearby room to merge — drag closer first'); return; }
+  const gid=el.dataset.merged||found.dataset.merged||'g'+Date.now();
+  el.dataset.merged=gid;
+  found.dataset.merged=gid;
+  el.classList.add('merged');
+  found.classList.add('merged');
+  const lab=el.querySelector('.label');
+  if(lab) lab.textContent=(lab.textContent||'Room').replace(/ copy|L Main|L Wing/g,'');
+  setStatus('Merged — both pieces move together');
+};
   if(!selected){ setStatus('Select a room first'); return; }
   const el=selected;
   const x=parseFloat(el.style.left)+30;
@@ -769,9 +832,9 @@ document.getElementById('wallH').onchange=e=>{ wallHeight=+e.target.value||96; s
 
 document.getElementById('wireCalc').onclick=()=>{
   const panel=[...document.querySelectorAll('.item')].find(el=>el.dataset.type==='panel');
-  if(!panel){ alert('Add a Main Panel first (⚡ Main Panel symbol)'); return; }
+  if(!panel){ appAlert('Add a Main Panel first (⚡ Main Panel symbol)'); return; }
   const outlets=[...document.querySelectorAll('.item[data-type="outlet"]')];
-  if(!outlets.length){ alert('No outlets found'); return; }
+  if(!outlets.length){ appAlert('No outlets found'); return; }
   const pr=panel.getBoundingClientRect();
   let total=0;
   outlets.forEach(o=>{
@@ -784,7 +847,7 @@ document.getElementById('wireCalc').onclick=()=>{
     total+=feet;
   });
   const withWaste=Math.ceil(total*1.15);
-  alert(`Approx wire needed:\n${outlets.length} outlets\n~${Math.round(total)} ft run\n+15% waste → ${withWaste} ft\n(Add more for multi-wire circuits)`);
+  appAlert(`Approx wire needed:\n${outlets.length} outlets\n~${Math.round(total)} ft run\n+15% waste → ${withWaste} ft`);
   setStatus(`Wire est: ${withWaste} ft`);
 };
 
@@ -838,7 +901,9 @@ document.getElementById('unit').onchange=e=>{
 document.getElementById('undoBtn').onclick=()=>{
   if(history.length){canvas.innerHTML=history.pop(); document.querySelectorAll('.item').forEach(bind); selected=null; showProps();}
 };
-document.getElementById('clearBtn').onclick=()=>{if(confirm('Clear all?')){saveState(); canvas.innerHTML=''; selected=null; showProps();}};
+document.getElementById('clearBtn').onclick=()=>{
+  appConfirm('Clear all?',ok=>{ if(ok){ saveState(); canvas.innerHTML=''; selected=null; showProps(); } });
+};
 
 document.getElementById('saveBtn').onclick=()=>{
   const name=prompt('Name this layout:','My Floor Plan')||'Untitled';
@@ -876,7 +941,7 @@ window.openLayout=function(i){
   const list=document.getElementById('layoutList'); if(list) list.remove();
 };
 window.deleteLayout=function(i){
-  if(!confirm('Delete this layout?')) return;
+  appConfirm('Delete this layout?',ok=>{ if(!ok) return;
   const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
   layouts.splice(i,1);
   localStorage.setItem('ff_layouts',JSON.stringify(layouts));
@@ -898,7 +963,9 @@ document.getElementById('exportBtn').onclick=async()=>{
   }catch(err){setStatus('Export failed'); alert('Export error');}
 };
 
-document.getElementById('tmplEmpty').onclick=()=>{if(confirm('Clear and start empty?')){canvas.innerHTML=''; selected=null; showProps();}};
+document.getElementById('tmplEmpty').onclick=()=>{
+  appConfirm('Clear and start empty?',ok=>{ if(ok){ canvas.innerHTML=''; selected=null; showProps(); } });
+};
 document.getElementById('tmplApt').onclick=()=>{
   canvas.innerHTML='';
   createItem('room',80,80,px(18),px(14),'Living','room');
