@@ -199,6 +199,8 @@ function snapToOthers(el,x,y){
   });
   return {x:nx,y:ny};
 }
+
+function updateDims(el){
   const d=el.querySelector('.dims');
   if(!d) return;
   const w=parseFloat(el.style.width)||0;
