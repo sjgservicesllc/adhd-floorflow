@@ -73,6 +73,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
   <h1>⚡ ADHD FLOORFLOW</h1>
   <div class="toolbar">
     <button id="modeSelect" class="active">Select</button>
+    <button id="modeMulti">Multi</button>
     <button id="modeWall">Draw Wall</button>
     <button id="modeMeasure">Measure</button>
     <button id="addRoom">+ Room</button>
@@ -252,10 +253,11 @@ function bind(el){
   el.addEventListener('pointerdown',e=>{
     if(e.target.classList.contains('resize-handle')) return startResize(e,el);
     if(mode==='wall'||mode==='measure') return;
-    if(e.shiftKey){
+    if(e.shiftKey || mode==='multi'){
       if(selectedSet.has(el)) selectedSet.delete(el);
       else selectedSet.add(el);
       el.classList.toggle('multi-selected', selectedSet.has(el));
+      setStatus(selectedSet.size+' selected — drag any to move group');
       return;
     }
     select(el);
@@ -403,6 +405,7 @@ function applyLayers(){
 
 // Modes
 document.getElementById('modeSelect').onclick=()=>{mode='select'; setActive('modeSelect'); setStatus('Select mode');};
+document.getElementById('modeMulti').onclick=()=>{mode='multi'; setActive('modeMulti'); setStatus('Multi mode — tap rooms to add to group, then drag any to move all');};
 document.getElementById('modeWall').onclick=()=>{mode='wall'; setActive('modeWall'); setStatus('Click & drag to draw walls · Switch to Select to edit');};
 document.getElementById('modeMeasure').onclick=()=>{mode='measure'; setActive('modeMeasure'); setStatus('Click two points to measure');};
 function setActive(id){
@@ -864,7 +867,7 @@ document.querySelectorAll('.symbol-btn,.sidebar button').forEach(el=>{
   });
 });
 createItem('room',100,100,px(16),px(12),'Living Room','room');
-setStatus('Ready — Login to save designs · Shift+click multi-select · Measure tool · Layers');
+setStatus('Ready — Multi mode to select groups · Shift+click also works');
 </script>
 </body>
 </html>
