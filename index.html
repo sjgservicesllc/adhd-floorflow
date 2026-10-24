@@ -67,7 +67,8 @@ header h1{font-size:18px;font-weight:650;letter-spacing:-0.3px}
     <button id="exportBtn">Export PNG</button>
     <select id="unit"><option value="ft">Feet</option><option value="in">Inches</option><option value="m">Meters</option></select>
     <label style="font-size:13px">Wall H <input type="number" id="wallH" value="96" min="72" max="144" style="width:52px"> in</label>
-    <label style="font-size:13px">Scale <input type="number" id="scale" value="20" min="4" max="80" style="width:52px"> px</label>
+    <label style="font-size:13px">Zoom <input type="number" id="zoom" value="100" min="20" max="400" style="width:56px"> %</label>
+    <button id="zoomFit">Fit</button>
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
   </div>
@@ -130,12 +131,26 @@ const canvas=document.getElementById('canvas');
 const wrap=document.getElementById('wrap');
 const props=document.getElementById('props');
 const statusEl=document.getElementById('status');
-let scale=20, unit='ft', selected=null, selectedSet=new Set(), drag=null, mode='select';
+let zoom=100, unit='ft', selected=null, selectedSet=new Set(), drag=null, mode='select';
 let history=[], id=1, measureStart=null;
-const snap=()=>scale*0.25;
+const BASE=20; // pixels per foot at 100% zoom
+function scale(){ return BASE*(zoom/100); }
+const snap=()=>scale()*0.25;
 
-function px(v){return v*scale}
-function toU(v){return (v/scale).toFixed(1)}
+function px(vFeet){ return vFeet*scale(); }
+function toFeet(vPx){ return vPx/scale(); }
+function toU(vPx){
+  const feet=toFeet(vPx);
+  if(unit==='in') return (feet*12).toFixed(1);
+  if(unit==='m') return (feet*0.3048).toFixed(2);
+  return feet.toFixed(1);
+}
+function fromU(val){
+  // convert user input in current unit to feet
+  if(unit==='in') return val/12;
+  if(unit==='m') return val/0.3048;
+  return val;
+}
 function setStatus(t){statusEl.textContent=t}
 
 function saveState(){
@@ -154,6 +169,8 @@ function createItem(type,x,y,w,h,label='',layer='furniture'){
   el.style.top=Math.round(y/snap())*snap()+'px';
   el.style.width=w+'px';
   el.style.height=h+'px';
+  el.dataset.feetW=toFeet(w);
+  el.dataset.feetH=toFeet(h);
   if(label){
     const l=document.createElement('div');
     l.className='label';
@@ -176,7 +193,7 @@ function createItem(type,x,y,w,h,label='',layer='furniture'){
 }
 
 function snapToOthers(el,x,y){
-  const thresh=scale*0.4;
+  const thresh=scale()*0.4;
   const w=parseFloat(el.style.width)||0;
   const h=parseFloat(el.style.height)||0;
   let nx=x, ny=y;
@@ -242,8 +259,8 @@ function startResize(e,el){
 document.addEventListener('pointermove',e=>{
   if(!drag) return;
   if(drag.resizing){
-    let w=Math.max(scale*0.5, drag.ow+(e.clientX-drag.sx));
-    let h=Math.max(scale*0.5, drag.oh+(e.clientY-drag.sy));
+    let w=Math.max(scale()*0.5, drag.ow+(e.clientX-drag.sx));
+    let h=Math.max(scale()*0.5, drag.oh+(e.clientY-drag.sy));
     w=Math.round(w/snap())*snap();
     h=Math.round(h/snap())*snap();
     drag.el.style.width=w+'px';
@@ -307,8 +324,18 @@ function showProps(){
     <label style="margin-top:10px"><input type="checkbox" id="pLock" ${locked?'checked':''}> Locked</label>
     <button id="del" style="margin-top:12px;width:100%;background:#b91c1c;border:none;padding:8px;color:#fff;border-radius:6px;cursor:pointer">Delete</button>
   `;
-  document.getElementById('pW').onchange=e=>{el.style.width=px(+e.target.value)+'px'; updateDims(el); saveState();};
-  document.getElementById('pH').onchange=e=>{el.style.height=px(+e.target.value)+'px'; updateDims(el); saveState();};
+  document.getElementById('pW').onchange=e=>{
+    const feet=fromU(+e.target.value);
+    el.style.width=px(feet)+'px';
+    el.dataset.feetW=feet;
+    updateDims(el); saveState();
+  };
+  document.getElementById('pH').onchange=e=>{
+    const feet=fromU(+e.target.value);
+    el.style.height=px(feet)+'px';
+    el.dataset.feetH=feet;
+    updateDims(el); saveState();
+  };
   if(lab) document.getElementById('pL').onchange=e=>{lab.textContent=e.target.value; saveState();};
   document.getElementById('pLock').onchange=e=>el.classList.toggle('locked',e.target.checked);
   document.getElementById('del').onclick=()=>{el.remove(); selected=null; showProps(); saveState();};
@@ -358,7 +385,7 @@ canvas.addEventListener('pointerdown',e=>{
       setStatus('Click second point');
     } else {
       const dx=x-measureStart.x, dy=y-measureStart.y;
-      const dist=Math.hypot(dx,dy)/scale;
+      const dist=Math.hypot(dx,dy)/scale();
       const line=document.createElement('div');
       line.className='measure-line';
       const len=Math.hypot(dx,dy);
@@ -410,9 +437,8 @@ function getPreset(t){
   const base=presetsBase[t];
   if(!base) return [4,3,t,'furniture'];
   const [bw,bh,lab]=base;
-  const factor=unit==='in'?12:unit==='m'?0.3048:1;
   const layer=['toilet','sink','tub','washer'].includes(t)?'plumbing':t==='panel'?'electrical':'furniture';
-  return [bw*factor, bh*factor, lab, layer];
+  return [bw, bh, lab, layer]; // always in feet
 }
 
 document.querySelectorAll('.symbol-btn').forEach(btn=>{
@@ -422,7 +448,8 @@ document.querySelectorAll('.symbol-btn').forEach(btn=>{
       const name=prompt('Furniture name:','Custom Piece')||'Custom';
       const w=parseFloat(prompt(`Width (${unit}):`,'48'))||48;
       const h=parseFloat(prompt(`Depth / Length (${unit}):`,'24'))||24;
-      createItem('furniture',220,220,px(w),px(h),name,'furniture');
+      const feetW=fromU(w), feetH=fromU(h);
+      createItem('furniture',220,220,px(feetW),px(feetH),name,'furniture');
       setStatus(`Added ${name} ${w}×${h} ${unit}`);
     } else if(t==='outlet'){
       const el=createItem('outlet',300,300,18,18,'','electrical');
@@ -443,12 +470,48 @@ document.getElementById('quickRoom').onkeydown=e=>{
   const m=raw.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
   if(!m){ setStatus('Use format: 12x15 or 144x180'); return; }
   let w=+m[1], h=+m[2];
-  // If both > 30 assume inches, else feet
-  if(w>30 && h>30 && unit!=='in'){ w/=12; h/=12; }
-  createItem('room',120,120,px(w),px(h),'Room','room');
+  // If numbers look like inches (both > 30) and unit is feet, convert
+  if(unit==='ft' && w>30 && h>30){ w/=12; h/=12; }
+  const feetW=fromU(w), feetH=fromU(h);
+  createItem('room',120,120,px(feetW),px(feetH),'Room','room');
   e.target.value='';
   setStatus(`Created room ${w}×${h} ${unit}`);
 };
+
+document.getElementById('zoom').onchange=e=>{
+  zoom=+e.target.value||100;
+  applyZoom();
+};
+document.getElementById('zoomFit').onclick=()=>{
+  const items=[...document.querySelectorAll('.item')];
+  if(!items.length){ zoom=100; applyZoom(); return; }
+  let maxX=0, maxY=0;
+  items.forEach(el=>{
+    const r=el.getBoundingClientRect();
+    const c=canvas.getBoundingClientRect();
+    maxX=Math.max(maxX, parseFloat(el.style.left)+parseFloat(el.style.width));
+    maxY=Math.max(maxY, parseFloat(el.style.top)+parseFloat(el.style.height));
+  });
+  const viewW=wrap.clientWidth-40, viewH=wrap.clientHeight-40;
+  const needW=maxX, needH=maxY;
+  const fitZ=Math.min(200, Math.max(30, Math.min(viewW/needW, viewH/needH)*100));
+  zoom=Math.round(fitZ);
+  document.getElementById('zoom').value=zoom;
+  applyZoom();
+  setStatus(`Zoomed to fit (${zoom}%)`);
+};
+function applyZoom(){
+  document.querySelectorAll('.item').forEach(el=>{
+    const feetW=parseFloat(el.dataset.feetW)||toFeet(parseFloat(el.style.width));
+    const feetH=parseFloat(el.dataset.feetH)||toFeet(parseFloat(el.style.height));
+    el.dataset.feetW=feetW;
+    el.dataset.feetH=feetH;
+    el.style.width=px(feetW)+'px';
+    el.style.height=px(feetH)+'px';
+    updateDims(el);
+  });
+  setStatus(`Zoom ${zoom}% · 1 ft = ${scale().toFixed(1)} px`);
+}
 
 let wallHeight=96;
 document.getElementById('wallH').onchange=e=>{ wallHeight=+e.target.value||96; setStatus(`Wall height: ${wallHeight} in`); };
@@ -462,8 +525,8 @@ document.getElementById('wireCalc').onclick=()=>{
   let total=0;
   outlets.forEach(o=>{
     const or=o.getBoundingClientRect();
-    const dx=Math.abs(or.left-pr.left)/scale;
-    const dy=Math.abs(or.top-pr.top)/scale;
+    const dx=Math.abs(or.left-pr.left)/scale();
+    const dy=Math.abs(or.top-pr.top)/scale();
     const dist=Math.hypot(dx,dy);
     // rough: horizontal + 2x wall height drops (in feet)
     const feet=dist + (wallHeight/12)*2;
@@ -516,25 +579,10 @@ function render3D(){
   html+='</div>';
   v3.innerHTML=html;
 }
-const scaleEl=document.getElementById('scale');
-if(scaleEl) scaleEl.onchange=e=>{scale=+e.target.value||20; document.querySelectorAll('.item').forEach(updateDims); setStatus(`Scale ${scale} px/unit`);};
 document.getElementById('unit').onchange=e=>{
-  const oldUnit=unit;
   unit=e.target.value;
-  // Convert existing items when switching units
-  const factors={ft:1, in:12, m:0.3048};
-  const factor=(factors[oldUnit]||1)/(factors[unit]||1);
-  document.querySelectorAll('.item').forEach(el=>{
-    const w=parseFloat(el.style.width)||0;
-    const h=parseFloat(el.style.height)||0;
-    el.style.width=(w*factor)+'px';
-    el.style.height=(h*factor)+'px';
-    updateDims(el);
-  });
-  // Suggest better scale for inches
-  if(unit==='in' && scale<10){ document.getElementById('scale').value=4; scale=4; }
-  if(unit==='ft' && scale<15){ document.getElementById('scale').value=20; scale=20; }
-  setStatus(`Unit: ${unit} · Scale ${scale} px/unit`);
+  document.querySelectorAll('.item').forEach(updateDims);
+  setStatus(`Unit: ${unit} · dimensions updated`);
 };
 document.getElementById('undoBtn').onclick=()=>{
   if(history.length){canvas.innerHTML=history.pop(); document.querySelectorAll('.item').forEach(bind); selected=null; showProps();}
@@ -544,7 +592,7 @@ document.getElementById('clearBtn').onclick=()=>{if(confirm('Clear all?')){saveS
 document.getElementById('saveBtn').onclick=()=>{
   const data=canvas.innerHTML;
   localStorage.setItem('floorplan',data);
-  const blob=new Blob([JSON.stringify({html:data,scale,unit})],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({html:data,zoom,unit})],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='floorplan.json'; a.click();
   setStatus('Saved');
 };
@@ -557,7 +605,7 @@ document.getElementById('loadBtn').onclick=()=>{
       try{
         const d=JSON.parse(r.result);
         canvas.innerHTML=d.html||'';
-        if(d.scale){scale=d.scale; document.getElementById('scale').value=scale;}
+        if(d.zoom){zoom=d.zoom; document.getElementById('zoom').value=zoom; applyZoom();}
         document.querySelectorAll('.item').forEach(bind);
         setStatus('Loaded');
       }catch{alert('Invalid file')}
@@ -686,7 +734,7 @@ function showDesignList(){
   document.getElementById('saveAsBtn').onclick=()=>{
     const name=prompt('Design name','My Floor Plan')||'Untitled';
     if(!designs[currentUser]) designs[currentUser]=[];
-    designs[currentUser].push({name,html:canvas.innerHTML,scale,unit,saved:Date.now()});
+    designs[currentUser].push({name,html:canvas.innerHTML,zoom,unit,saved:Date.now()});
     saveDesigns();
     showDesignList();
     setStatus('Saved: '+name);
@@ -696,7 +744,7 @@ window.loadDesign=function(i){
   if(!currentUser||!designs[currentUser]||!designs[currentUser][i]) return;
   const d=designs[currentUser][i];
   canvas.innerHTML=d.html||'';
-  if(d.scale){ scale=d.scale; document.getElementById('scale').value=scale; }
+  if(d.zoom){ zoom=d.zoom; document.getElementById('zoom').value=zoom; applyZoom(); }
   if(d.unit){ unit=d.unit; document.getElementById('unit').value=unit; }
   document.querySelectorAll('.item').forEach(bind);
   setStatus('Loaded: '+d.name);
