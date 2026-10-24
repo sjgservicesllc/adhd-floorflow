@@ -61,8 +61,8 @@ header h1{font-size:18px;font-weight:650;letter-spacing:-0.3px}
     <button id="mode2d" class="active">2D Plan</button>
     <button id="mode3d">3D View</button>
     <button id="wireCalc">Wire Est.</button>
-    <button id="saveBtn">Save</button>
-    <button id="loadBtn">Load</button>
+    <button id="saveBtn">Save Layout</button>
+    <button id="openBtn">Open Saved</button>
     <button id="authBtn" style="background:#3b82f6;margin-left:8px">Login</button>
     <button id="exportBtn">Export PNG</button>
     <select id="unit"><option value="ft">Feet</option><option value="in">Inches</option><option value="m">Meters</option></select>
@@ -590,29 +590,46 @@ document.getElementById('undoBtn').onclick=()=>{
 document.getElementById('clearBtn').onclick=()=>{if(confirm('Clear all?')){saveState(); canvas.innerHTML=''; selected=null; showProps();}};
 
 document.getElementById('saveBtn').onclick=()=>{
-  const data=canvas.innerHTML;
-  localStorage.setItem('floorplan',data);
-  const blob=new Blob([JSON.stringify({html:data,zoom,unit})],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='floorplan.json'; a.click();
-  setStatus('Saved');
+  const name=prompt('Name this layout:','My Floor Plan')||'Untitled';
+  const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
+  layouts.push({name,html:canvas.innerHTML,zoom,unit,saved:Date.now()});
+  localStorage.setItem('ff_layouts',JSON.stringify(layouts));
+  setStatus('Saved: '+name);
+  showLayoutList();
 };
-document.getElementById('loadBtn').onclick=()=>{
-  const input=document.createElement('input'); input.type='file'; input.accept='.json';
-  input.onchange=e=>{
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader();
-    r.onload=()=>{
-      try{
-        const d=JSON.parse(r.result);
-        canvas.innerHTML=d.html||'';
-        if(d.zoom){zoom=d.zoom; document.getElementById('zoom').value=zoom; applyZoom();}
-        document.querySelectorAll('.item').forEach(bind);
-        setStatus('Loaded');
-      }catch{alert('Invalid file')}
-    };
-    r.readAsText(f);
-  };
-  input.click();
+document.getElementById('openBtn').onclick=showLayoutList;
+function showLayoutList(){
+  const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
+  let box=document.getElementById('layoutList');
+  if(!box){
+    box=document.createElement('div');
+    box.id='layoutList';
+    box.style.cssText='position:fixed;top:60px;right:20px;width:280px;background:#1a1d24;border:1px solid #2d3340;border-radius:10px;padding:14px;z-index:50;max-height:70vh;overflow-y:auto';
+    document.body.appendChild(box);
+  }
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>Saved Layouts</strong><button onclick="document.getElementById(\'layoutList\').remove()" style="background:transparent;border:none;color:#9aa0a6;cursor:pointer;font-size:16px">✕</button></div>'+
+    (layouts.length?layouts.map((d,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2d3340">
+      <span style="cursor:pointer;color:#60a5fa" onclick="openLayout(${i})">${d.name}<br><span style="font-size:11px;color:#9aa0a6">${new Date(d.saved).toLocaleDateString()}</span></span>
+      <button onclick="deleteLayout(${i})" style="background:#b91c1c;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer">✕</button>
+    </div>`).join(''):'<div style="color:#9aa0a6;font-size:13px">No saved layouts yet. Click Save Layout to store one.</div>');
+}
+window.openLayout=function(i){
+  const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
+  if(!layouts[i]) return;
+  const d=layouts[i];
+  canvas.innerHTML=d.html||'';
+  if(d.zoom){ zoom=d.zoom; document.getElementById('zoom').value=zoom; applyZoom(); }
+  if(d.unit){ unit=d.unit; document.getElementById('unit').value=unit; }
+  document.querySelectorAll('.item').forEach(bind);
+  setStatus('Opened: '+d.name);
+  const list=document.getElementById('layoutList'); if(list) list.remove();
+};
+window.deleteLayout=function(i){
+  if(!confirm('Delete this layout?')) return;
+  const layouts=JSON.parse(localStorage.getItem('ff_layouts')||'[]');
+  layouts.splice(i,1);
+  localStorage.setItem('ff_layouts',JSON.stringify(layouts));
+  showLayoutList();
 };
 
 document.getElementById('exportBtn').onclick=async()=>{
