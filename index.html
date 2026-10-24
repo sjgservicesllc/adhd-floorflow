@@ -754,6 +754,7 @@ document.getElementById('mergeBtn').onclick=()=>{
   if(lab) lab.textContent=(lab.textContent||'Room').replace(/ copy|L Main|L Wing/g,'');
   setStatus('Merged — both pieces move together');
 };
+document.getElementById('cloneBtn').onclick=()=>{
   if(!selected){ setStatus('Select a room first'); return; }
   const el=selected;
   const x=parseFloat(el.style.left)+30;
