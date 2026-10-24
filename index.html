@@ -1,1 +1,722 @@
-PLACEHOLDER_WILL_REPLACE
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ADHD FloorFlow</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { --bg:#0f1115; --panel:#1a1d24; --accent:#3b82f6; --border:#2d3340; --text:#e8eaed; --muted:#9aa0a6; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{background:#12141a;padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+header h1{font-size:18px;font-weight:650;letter-spacing:-0.3px}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.toolbar button,.toolbar select,.toolbar input{background:#252932;color:var(--text);border:1px solid #3a4050;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+.toolbar button:hover{background:#2f3540}
+.toolbar button.active{background:var(--accent);border-color:#60a5fa}
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:310px;background:var(--panel);border-right:1px solid var(--border);padding:14px;overflow-y:auto;flex-shrink:0}
+.sidebar h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:16px 0 8px}
+.symbol-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.symbol-btn{background:#252932;border:1px solid #3a4050;border-radius:6px;padding:9px 5px;text-align:center;cursor:pointer;font-size:12px}
+.symbol-btn:hover{background:#2f3540;border-color:var(--accent)}
+.canvas-wrap{flex:1;position:relative;overflow:auto;background:#0c0e12}
+#canvas{position:relative;background:#14161c;background-image:linear-gradient(#1e2128 1px,transparent 1px),linear-gradient(90deg,#1e2128 1px,transparent 1px);background-size:20px 20px;min-width:2400px;min-height:1600px}
+.item{position:absolute;cursor:move;user-select:none}
+.room{border:3px solid #60a5fa;background:rgba(59,130,246,.06)}
+.wall{background:#4b5563}
+.door{background:#92400e;border:2px solid #b45309;position:relative}
+.door::before{content:'';position:absolute;left:0;top:50%;width:100%;height:100%;border:2px solid #f59e0b;border-radius:0 100% 0 0;border-left:none;border-bottom:none;transform:translateY(-50%);pointer-events:none;opacity:.9}
+.window{background:#7dd3fc;border:2px solid #38bdf8}
+.garage{background:#6b7280}
+.furniture{border:2px solid #a78bfa;background:rgba(167,139,250,.12)}
+.outlet{width:18px;height:18px;background:#fbbf24;border-radius:50%;border:2px solid #f59e0b;transform:translate(-50%,-50%)}
+.outlet::after{content:'⚡';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px}
+.panel{background:#1e3a5f;border:2px solid #60a5fa;border-radius:4px}
+.label{position:absolute;top:6px;left:6px;font-size:12px;font-weight:600;pointer-events:none}
+.dims{position:absolute;bottom:4px;right:4px;font-size:11px;color:var(--muted);pointer-events:none}
+.resize-handle{position:absolute;width:14px;height:14px;background:var(--accent);border-radius:3px;cursor:nwse-resize;z-index:2}
+.resize-handle.br{right:-7px;bottom:-7px}
+.selected{outline:2px solid #fbbf24;outline-offset:1px}
+.multi-selected{outline:2px solid #f97316}
+.locked{opacity:.75;border-style:dashed!important}
+.props label{display:block;margin:8px 0 3px;font-size:12px;color:var(--muted)}
+.props input,.props select{width:100%;padding:6px;background:#252932;color:var(--text);border:1px solid #3a4050;border-radius:4px}
+.info{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.5}
+#status{position:absolute;bottom:10px;left:320px;background:#1a1d24;padding:6px 12px;border-radius:6px;font-size:12px;border:1px solid var(--border);z-index:10}
+.layer-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px}
+.measure-line{position:absolute;background:#fbbf24;height:2px;pointer-events:none;z-index:5}
+.measure-label{position:absolute;background:#1a1d24;color:#fbbf24;padding:2px 6px;border-radius:4px;font-size:11px;pointer-events:none;z-index:6}
+</style>
+</head>
+<body>
+<header>
+  <h1>ADHD FloorFlow</h1>
+  <div class="toolbar">
+    <button id="modeSelect" class="active">Select</button>
+    <button id="modeWall">Draw Wall</button>
+    <button id="modeMeasure">Measure</button>
+    <button id="addRoom">+ Room</button>
+    <input id="quickRoom" placeholder="Type size: 12x15 or 144x180" style="width:160px" title="Type width x depth then Enter to create room">
+    <button id="mode2d" class="active">2D Plan</button>
+    <button id="mode3d">3D View</button>
+    <button id="wireCalc">Wire Est.</button>
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load</button>
+    <button id="authBtn" style="background:#3b82f6;margin-left:8px">Login</button>
+    <button id="exportBtn">Export PNG</button>
+    <select id="unit"><option value="ft">Feet</option><option value="in">Inches</option><option value="m">Meters</option></select>
+    <label style="font-size:13px">Wall H <input type="number" id="wallH" value="96" min="72" max="144" style="width:52px"> in</label>
+    <label style="font-size:13px">Scale <input type="number" id="scale" value="20" min="4" max="80" style="width:52px"> px</label>
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <h3>Symbols</h3>
+    <div class="symbol-grid">
+      <div class="symbol-btn" data-type="door">🚪 Door</div>
+      <div class="symbol-btn" data-type="window">🪟 Window</div>
+      <div class="symbol-btn" data-type="garage">🚗 Garage</div>
+      <div class="symbol-btn" data-type="outlet">⚡ Outlet</div>
+      <div class="symbol-btn" data-type="sofa">Sofa 7×3</div>
+      <div class="symbol-btn" data-type="bed">Bed 6.5×7</div>
+      <div class="symbol-btn" data-type="table">Table 6×3</div>
+      <div class="symbol-btn" data-type="fridge">Fridge</div>
+      <div class="symbol-btn" data-type="stove">Stove</div>
+      <div class="symbol-btn" data-type="chair">Chair</div>
+      <div class="symbol-btn" data-type="desk">Desk</div>
+      <div class="symbol-btn" data-type="toilet">Toilet</div>
+      <div class="symbol-btn" data-type="sink">Sink</div>
+      <div class="symbol-btn" data-type="tub">Bathtub</div>
+      <div class="symbol-btn" data-type="washer">Washer</div>
+      <div class="symbol-btn" data-type="nightstand">Nightstand</div>
+      <div class="symbol-btn" data-type="plant">Plant</div>
+      <div class="symbol-btn" data-type="panel">⚡ Main Panel</div>
+      <div class="symbol-btn" data-type="custom">➕ Custom Furniture</div>
+    </div>
+    <h3>Layers</h3>
+    <div class="layer-row"><input type="checkbox" id="layerRooms" checked> Rooms</div>
+    <div class="layer-row"><input type="checkbox" id="layerWalls" checked> Walls</div>
+    <div class="layer-row"><input type="checkbox" id="layerFurniture" checked> Furniture</div>
+    <div class="layer-row"><input type="checkbox" id="layerElectrical" checked> Electrical</div>
+    <div class="layer-row"><input type="checkbox" id="layerPlumbing" checked> Plumbing</div>
+    <h3>Templates</h3>
+    <button id="tmplEmpty" style="width:100%;margin-bottom:6px">Empty Canvas</button>
+    <button id="tmplApt" style="width:100%;margin-bottom:6px">1-Bed Apartment</button>
+    <button id="tmplHouse" style="width:100%">Simple House</button>
+    <h3>Properties</h3>
+    <div id="props">Select an item</div>
+    <div class="info">
+      Shift+click multi-select<br>
+      Drag selection to move group<br>
+      Measure: click two points<br>
+      Double-click labels<br>
+      Lock in properties<br>
+      Everything to scale · Type size to create room<br>
+      Main Panel + Wire Est. for builders<br>
+      Wall height for 3D & wire calcs
+    </div>
+  </div>
+  <div class="canvas-wrap" id="wrap">
+    <div id="canvas"></div>
+    <div id="view3d" style="display:none;width:100%;height:100%;background:#0c0e12;position:absolute;inset:0;overflow:auto"></div>
+  </div>
+</div>
+<div id="status">Ready</div>
+<script>
+const canvas=document.getElementById('canvas');
+const wrap=document.getElementById('wrap');
+const props=document.getElementById('props');
+const statusEl=document.getElementById('status');
+let scale=20, unit='ft', selected=null, selectedSet=new Set(), drag=null, mode='select';
+let history=[], id=1, measureStart=null;
+const snap=()=>scale*0.25;
+
+function px(v){return v*scale}
+function toU(v){return (v/scale).toFixed(1)}
+function setStatus(t){statusEl.textContent=t}
+
+function saveState(){
+  history.push(canvas.innerHTML);
+  if(history.length>50) history.shift();
+}
+
+function createItem(type,x,y,w,h,label='',layer='furniture'){
+  saveState();
+  const el=document.createElement('div');
+  el.className=`item ${type}`;
+  el.dataset.id=id++;
+  el.dataset.type=type;
+  el.dataset.layer=layer;
+  el.style.left=Math.round(x/snap())*snap()+'px';
+  el.style.top=Math.round(y/snap())*snap()+'px';
+  el.style.width=w+'px';
+  el.style.height=h+'px';
+  if(label){
+    const l=document.createElement('div');
+    l.className='label';
+    l.textContent=label;
+    el.appendChild(l);
+  }
+  const d=document.createElement('div');
+  d.className='dims';
+  el.appendChild(d);
+  if(!['door','window','garage','outlet','wall'].includes(type)){
+    const hnd=document.createElement('div');
+    hnd.className='resize-handle br';
+    el.appendChild(hnd);
+  }
+  canvas.appendChild(el);
+  updateDims(el);
+  bind(el);
+  applyLayers();
+  return el;
+}
+
+function snapToOthers(el,x,y){
+  const thresh=scale*0.4;
+  const w=parseFloat(el.style.width)||0;
+  const h=parseFloat(el.style.height)||0;
+  let nx=x, ny=y;
+  document.querySelectorAll('.item').forEach(o=>{
+    if(o===el) return;
+    const ox=parseFloat(o.style.left)||0;
+    const oy=parseFloat(o.style.top)||0;
+    const ow=parseFloat(o.style.width)||0;
+    const oh=parseFloat(o.style.height)||0;
+    // snap left/right edges
+    if(Math.abs(nx-(ox+ow))<thresh) nx=ox+ow;
+    if(Math.abs((nx+w)-ox)<thresh) nx=ox-w;
+    if(Math.abs(nx-ox)<thresh) nx=ox;
+    if(Math.abs((nx+w)-(ox+ow))<thresh) nx=ox+ow-w;
+    // snap top/bottom edges
+    if(Math.abs(ny-(oy+oh))<thresh) ny=oy+oh;
+    if(Math.abs((ny+h)-oy)<thresh) ny=oy-h;
+    if(Math.abs(ny-oy)<thresh) ny=oy;
+    if(Math.abs((ny+h)-(oy+oh))<thresh) ny=oy+oh-h;
+  });
+  return {x:nx,y:ny};
+}
+  const d=el.querySelector('.dims');
+  if(!d) return;
+  const w=parseFloat(el.style.width)||0;
+  const h=parseFloat(el.style.height)||0;
+  d.textContent=`${toU(w)} × ${toU(h)} ${unit}`;
+}
+
+function bind(el){
+  el.addEventListener('pointerdown',e=>{
+    if(e.target.classList.contains('resize-handle')) return startResize(e,el);
+    if(mode==='wall'||mode==='measure') return;
+    if(e.shiftKey){
+      if(selectedSet.has(el)) selectedSet.delete(el);
+      else selectedSet.add(el);
+      el.classList.toggle('multi-selected', selectedSet.has(el));
+      return;
+    }
+    select(el);
+    if(el.classList.contains('locked')) return;
+    drag={el, sx:e.clientX, sy:e.clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), multi:[...selectedSet]};
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('dblclick',e=>{
+    const l=el.querySelector('.label');
+    if(l){
+      const n=prompt('Label',l.textContent);
+      if(n!=null){l.textContent=n; saveState();}
+    }
+  });
+}
+
+function startResize(e,el){
+  e.stopPropagation();
+  if(el.classList.contains('locked')) return;
+  select(el);
+  drag={el, resizing:true, sx:e.clientX, sy:e.clientY, ow:parseFloat(el.style.width), oh:parseFloat(el.style.height)};
+}
+
+document.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  if(drag.resizing){
+    let w=Math.max(scale*0.5, drag.ow+(e.clientX-drag.sx));
+    let h=Math.max(scale*0.5, drag.oh+(e.clientY-drag.sy));
+    w=Math.round(w/snap())*snap();
+    h=Math.round(h/snap())*snap();
+    drag.el.style.width=w+'px';
+    drag.el.style.height=h+'px';
+    updateDims(drag.el);
+  } else {
+    const dx=e.clientX-drag.sx;
+    const dy=e.clientY-drag.sy;
+    let x=drag.ox+dx;
+    let y=drag.oy+dy;
+    x=Math.round(x/snap())*snap();
+    y=Math.round(y/snap())*snap();
+    const snapped=snapToOthers(drag.el,x,y);
+    drag.el.style.left=snapped.x+'px';
+    drag.el.style.top=snapped.y+'px';
+    if(drag.multi && drag.multi.length){
+      drag.multi.forEach(m=>{
+        if(m===drag.el) return;
+        const mx=parseFloat(m.style.left)+ (x-drag.ox);
+        const my=parseFloat(m.style.top)+ (y-drag.oy);
+        m.style.left=Math.round(mx/snap())*snap()+'px';
+        m.style.top=Math.round(my/snap())*snap()+'px';
+      });
+    }
+  }
+});
+document.addEventListener('pointerup',()=>{ if(drag){drag=null; saveState();} });
+
+function select(el){
+  selectedSet.forEach(s=>s.classList.remove('multi-selected'));
+  selectedSet.clear();
+  if(selected) selected.classList.remove('selected');
+  selected=el;
+  if(el){
+    el.classList.add('selected');
+    selectedSet.add(el);
+  }
+  showProps();
+}
+
+function showProps(){
+  if(!selected){props.innerHTML='Select an item'; return;}
+  const el=selected;
+  const w=toU(parseFloat(el.style.width));
+  const h=toU(parseFloat(el.style.height));
+  const locked=el.classList.contains('locked');
+  const lab=el.querySelector('.label');
+  props.innerHTML=`
+    <strong>${el.dataset.type}</strong>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <div style="flex:1">
+        <label style="display:block;margin-bottom:4px">Width (${unit})</label>
+        <input type="number" step="0.25" value="${w}" id="pW" style="width:100%">
+      </div>
+      <div style="flex:1">
+        <label style="display:block;margin-bottom:4px">Height (${unit})</label>
+        <input type="number" step="0.25" value="${h}" id="pH" style="width:100%">
+      </div>
+    </div>
+    ${lab?`<label>Label</label><input type="text" value="${lab.textContent}" id="pL">`:''}
+    <label style="margin-top:10px"><input type="checkbox" id="pLock" ${locked?'checked':''}> Locked</label>
+    <button id="del" style="margin-top:12px;width:100%;background:#b91c1c;border:none;padding:8px;color:#fff;border-radius:6px;cursor:pointer">Delete</button>
+  `;
+  document.getElementById('pW').onchange=e=>{el.style.width=px(+e.target.value)+'px'; updateDims(el); saveState();};
+  document.getElementById('pH').onchange=e=>{el.style.height=px(+e.target.value)+'px'; updateDims(el); saveState();};
+  if(lab) document.getElementById('pL').onchange=e=>{lab.textContent=e.target.value; saveState();};
+  document.getElementById('pLock').onchange=e=>el.classList.toggle('locked',e.target.checked);
+  document.getElementById('del').onclick=()=>{el.remove(); selected=null; showProps(); saveState();};
+}
+
+function applyLayers(){
+  const rooms=document.getElementById('layerRooms').checked;
+  const walls=document.getElementById('layerWalls').checked;
+  const furn=document.getElementById('layerFurniture').checked;
+  const elec=document.getElementById('layerElectrical').checked;
+  const plum=document.getElementById('layerPlumbing').checked;
+  document.querySelectorAll('.item').forEach(el=>{
+    const l=el.dataset.layer||'furniture';
+    let show=true;
+    if(l==='room' && !rooms) show=false;
+    if(l==='wall' && !walls) show=false;
+    if(l==='furniture' && !furn) show=false;
+    if(l==='electrical' && !elec) show=false;
+    if(l==='plumbing' && !plum) show=false;
+    el.style.display=show?'':'none';
+  });
+}
+['layerRooms','layerWalls','layerFurniture','layerElectrical','layerPlumbing'].forEach(id=>{
+  document.getElementById(id).onchange=applyLayers;
+});
+
+// Modes
+document.getElementById('modeSelect').onclick=()=>{mode='select'; setActive('modeSelect'); setStatus('Select mode');};
+document.getElementById('modeWall').onclick=()=>{mode='wall'; setActive('modeWall'); setStatus('Click & drag to draw walls');};
+document.getElementById('modeMeasure').onclick=()=>{mode='measure'; setActive('modeMeasure'); setStatus('Click two points to measure');};
+function setActive(id){
+  document.querySelectorAll('.toolbar button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+
+let wallStart=null;
+canvas.addEventListener('pointerdown',e=>{
+  if(e.target!==canvas) return;
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left+wrap.scrollLeft;
+  const y=e.clientY-rect.top+wrap.scrollTop;
+  if(mode==='wall'){
+    wallStart={x,y};
+  } else if(mode==='measure'){
+    if(!measureStart){
+      measureStart={x,y};
+      setStatus('Click second point');
+    } else {
+      const dx=x-measureStart.x, dy=y-measureStart.y;
+      const dist=Math.hypot(dx,dy)/scale;
+      const line=document.createElement('div');
+      line.className='measure-line';
+      const len=Math.hypot(dx,dy);
+      const ang=Math.atan2(dy,dx);
+      line.style.left=measureStart.x+'px';
+      line.style.top=measureStart.y+'px';
+      line.style.width=len+'px';
+      line.style.transformOrigin='0 50%';
+      line.style.transform=`rotate(${ang}rad)`;
+      const lab=document.createElement('div');
+      lab.className='measure-label';
+      lab.textContent=`${dist.toFixed(1)} ${unit}`;
+      lab.style.left=(measureStart.x+dx/2)+'px';
+      lab.style.top=(measureStart.y+dy/2-16)+'px';
+      canvas.appendChild(line);
+      canvas.appendChild(lab);
+      setTimeout(()=>{line.remove(); lab.remove();},4000);
+      setStatus(`Measured ${dist.toFixed(1)} ${unit}`);
+      measureStart=null;
+    }
+  }
+});
+canvas.addEventListener('pointerup',e=>{
+  if(mode!=='wall'||!wallStart) return;
+  const rect=canvas.getBoundingClientRect();
+  const x2=e.clientX-rect.left+wrap.scrollLeft;
+  const y2=e.clientY-rect.top+wrap.scrollTop;
+  const dx=x2-wallStart.x, dy=y2-wallStart.y;
+  const len=Math.hypot(dx,dy);
+  if(len<10){wallStart=null; return;}
+  const thick=8;
+  const angle=Math.atan2(dy,dx);
+  const el=createItem('wall',wallStart.x,wallStart.y-thick/2,len,thick,'','wall');
+  el.style.transformOrigin='0 50%';
+  el.style.transform=`rotate(${angle}rad)`;
+  wallStart=null;
+  setStatus('Wall drawn');
+});
+
+const presetsBase={
+  sofa:[7,3,'Sofa'], bed:[6.5,7,'Bed'], table:[6,3,'Table'],
+  fridge:[3,2.5,'Fridge'], stove:[2.5,2.2,'Stove'], chair:[1.8,1.8,'Chair'],
+  desk:[5,2.5,'Desk'], toilet:[1.5,2.5,'Toilet'], sink:[2,1.5,'Sink'],
+  tub:[2.5,5,'Tub'], washer:[2.3,2.3,'Washer'], nightstand:[1.5,1.5,'Nightstand'],
+  plant:[1.2,1.2,'Plant'], door:[3,0.8,'Door'], window:[4,0.5,'Window'],
+  garage:[16,1,'Garage'], panel:[1.5,2.5,'Main Panel']
+};
+function getPreset(t){
+  const base=presetsBase[t];
+  if(!base) return [4,3,t,'furniture'];
+  const [bw,bh,lab]=base;
+  const factor=unit==='in'?12:unit==='m'?0.3048:1;
+  const layer=['toilet','sink','tub','washer'].includes(t)?'plumbing':t==='panel'?'electrical':'furniture';
+  return [bw*factor, bh*factor, lab, layer];
+}
+
+document.querySelectorAll('.symbol-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    const t=btn.dataset.type;
+    if(t==='custom'){
+      const name=prompt('Furniture name:','Custom Piece')||'Custom';
+      const w=parseFloat(prompt(`Width (${unit}):`,'48'))||48;
+      const h=parseFloat(prompt(`Depth / Length (${unit}):`,'24'))||24;
+      createItem('furniture',220,220,px(w),px(h),name,'furniture');
+      setStatus(`Added ${name} ${w}×${h} ${unit}`);
+    } else if(t==='outlet'){
+      const el=createItem('outlet',300,300,18,18,'','electrical');
+      el.style.width=el.style.height='18px';
+    } else {
+      const [w,h,lab,layer]=getPreset(t);
+      const cls=t==='door'||t==='window'||t==='garage'?t:'furniture';
+      createItem(cls,180,180,px(w),px(h),lab,layer);
+    }
+    mode='select'; setActive('modeSelect');
+  };
+});
+
+document.getElementById('addRoom').onclick=()=>createItem('room',100,100,px(14),px(12),'Room','room');
+document.getElementById('quickRoom').onkeydown=e=>{
+  if(e.key!=='Enter') return;
+  const raw=e.target.value.trim();
+  const m=raw.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
+  if(!m){ setStatus('Use format: 12x15 or 144x180'); return; }
+  let w=+m[1], h=+m[2];
+  // If both > 30 assume inches, else feet
+  if(w>30 && h>30 && unit!=='in'){ w/=12; h/=12; }
+  createItem('room',120,120,px(w),px(h),'Room','room');
+  e.target.value='';
+  setStatus(`Created room ${w}×${h} ${unit}`);
+};
+
+let wallHeight=96;
+document.getElementById('wallH').onchange=e=>{ wallHeight=+e.target.value||96; setStatus(`Wall height: ${wallHeight} in`); };
+
+document.getElementById('wireCalc').onclick=()=>{
+  const panel=[...document.querySelectorAll('.item')].find(el=>el.dataset.type==='panel');
+  if(!panel){ alert('Add a Main Panel first (⚡ Main Panel symbol)'); return; }
+  const outlets=[...document.querySelectorAll('.item[data-type="outlet"]')];
+  if(!outlets.length){ alert('No outlets found'); return; }
+  const pr=panel.getBoundingClientRect();
+  let total=0;
+  outlets.forEach(o=>{
+    const or=o.getBoundingClientRect();
+    const dx=Math.abs(or.left-pr.left)/scale;
+    const dy=Math.abs(or.top-pr.top)/scale;
+    const dist=Math.hypot(dx,dy);
+    // rough: horizontal + 2x wall height drops (in feet)
+    const feet=dist + (wallHeight/12)*2;
+    total+=feet;
+  });
+  const withWaste=Math.ceil(total*1.15);
+  alert(`Approx wire needed:\n${outlets.length} outlets\n~${Math.round(total)} ft run\n+15% waste → ${withWaste} ft\n(Add more for multi-wire circuits)`);
+  setStatus(`Wire est: ${withWaste} ft`);
+};
+
+let currentView='2d';
+function showView(v){
+  currentView=v;
+  const c=document.getElementById('canvas');
+  const v3=document.getElementById('view3d');
+  document.getElementById('mode2d').classList.toggle('active',v==='2d');
+  document.getElementById('mode3d').classList.toggle('active',v==='3d');
+  if(v==='2d'){
+    c.style.display='';
+    v3.style.display='none';
+    setStatus('2D Plan view');
+  } else {
+    c.style.display='none';
+    v3.style.display='block';
+    render3D();
+    setStatus('3D View · click 2D Plan to switch back');
+  }
+}
+document.getElementById('mode2d').onclick=()=>showView('2d');
+document.getElementById('mode3d').onclick=()=>showView('3d');
+
+function render3D(){
+  const v3=document.getElementById('view3d');
+  const rooms=[...document.querySelectorAll('.item.room')];
+  if(!rooms.length){ v3.innerHTML='<div style="padding:40px;color:#9aa0a6">Add rooms in 2D first, then switch to 3D</div>'; return; }
+  let html='<div style="padding:20px;font-family:system-ui">';
+  html+='<h2 style="margin-bottom:12px">3D Preview (wall height '+wallHeight+' in)</h2>';
+  html+='<p style="color:#9aa0a6;margin-bottom:16px">Rooms extruded to wall height. Switch back to 2D Plan anytime.</p>';
+  rooms.forEach((r,i)=>{
+    const w=toU(parseFloat(r.style.width)||0);
+    const d=toU(parseFloat(r.style.height)||0);
+    const label=r.querySelector('.label')?.textContent||'Room';
+    html+=`<div style="margin:12px 0;padding:12px;background:#1a1d24;border-radius:8px;border-left:4px solid #3b82f6">
+      <strong>${label}</strong> · ${w} × ${d} ${unit}<br>
+      <span style="color:#9aa0a6">Wall height: ${wallHeight} in · Volume: ~${(w*d*(wallHeight/12)).toFixed(0)} cu ${unit}</span>
+    </div>`;
+  });
+  html+='<p style="margin-top:20px;color:#9aa0a6">Furniture and outlets from the 2D plan can be placed on walls. Full interactive 3D rotation coming next.</p>';
+  html+='<button onclick="document.getElementById(\'mode2d\').click()" style="margin-top:16px;padding:8px 16px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer">← Back to 2D Plan</button>';
+  html+='</div>';
+  v3.innerHTML=html;
+}
+const scaleEl=document.getElementById('scale');
+if(scaleEl) scaleEl.onchange=e=>{scale=+e.target.value||20; document.querySelectorAll('.item').forEach(updateDims); setStatus(`Scale ${scale} px/unit`);};
+document.getElementById('unit').onchange=e=>{
+  const oldUnit=unit;
+  unit=e.target.value;
+  // Convert existing items when switching units
+  const factors={ft:1, in:12, m:0.3048};
+  const factor=(factors[oldUnit]||1)/(factors[unit]||1);
+  document.querySelectorAll('.item').forEach(el=>{
+    const w=parseFloat(el.style.width)||0;
+    const h=parseFloat(el.style.height)||0;
+    el.style.width=(w*factor)+'px';
+    el.style.height=(h*factor)+'px';
+    updateDims(el);
+  });
+  // Suggest better scale for inches
+  if(unit==='in' && scale<10){ document.getElementById('scale').value=4; scale=4; }
+  if(unit==='ft' && scale<15){ document.getElementById('scale').value=20; scale=20; }
+  setStatus(`Unit: ${unit} · Scale ${scale} px/unit`);
+};
+document.getElementById('undoBtn').onclick=()=>{
+  if(history.length){canvas.innerHTML=history.pop(); document.querySelectorAll('.item').forEach(bind); selected=null; showProps();}
+};
+document.getElementById('clearBtn').onclick=()=>{if(confirm('Clear all?')){saveState(); canvas.innerHTML=''; selected=null; showProps();}};
+
+document.getElementById('saveBtn').onclick=()=>{
+  const data=canvas.innerHTML;
+  localStorage.setItem('floorplan',data);
+  const blob=new Blob([JSON.stringify({html:data,scale,unit})],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='floorplan.json'; a.click();
+  setStatus('Saved');
+};
+document.getElementById('loadBtn').onclick=()=>{
+  const input=document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const d=JSON.parse(r.result);
+        canvas.innerHTML=d.html||'';
+        if(d.scale){scale=d.scale; document.getElementById('scale').value=scale;}
+        document.querySelectorAll('.item').forEach(bind);
+        setStatus('Loaded');
+      }catch{alert('Invalid file')}
+    };
+    r.readAsText(f);
+  };
+  input.click();
+};
+
+document.getElementById('exportBtn').onclick=async()=>{
+  setStatus('Exporting...');
+  if(!window.html2canvas){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(s);
+    await new Promise(r=>s.onload=r);
+  }
+  try{
+    const c=await html2canvas(canvas,{backgroundColor:'#14161c',scale:1.5});
+    const a=document.createElement('a'); a.href=c.toDataURL('image/png'); a.download='floorplan.png'; a.click();
+    setStatus('Exported PNG');
+  }catch(err){setStatus('Export failed'); alert('Export error');}
+};
+
+document.getElementById('tmplEmpty').onclick=()=>{if(confirm('Clear and start empty?')){canvas.innerHTML=''; selected=null; showProps();}};
+document.getElementById('tmplApt').onclick=()=>{
+  canvas.innerHTML='';
+  createItem('room',80,80,px(18),px(14),'Living','room');
+  createItem('room',80+px(18),80,px(10),px(10),'Kitchen','room');
+  createItem('room',80,80+px(14),px(12),px(12),'Bedroom','room');
+  createItem('room',80+px(12),80+px(14),px(6),px(8),'Bath','room');
+  setStatus('Apartment template');
+};
+document.getElementById('tmplHouse').onclick=()=>{
+  canvas.innerHTML='';
+  createItem('room',60,60,px(24),px(16),'Living/Dining','room');
+  createItem('room',60+px(24),60,px(12),px(12),'Kitchen','room');
+  createItem('room',60,60+px(16),px(14),px(14),'Master','room');
+  createItem('room',60+px(14),60+px(16),px(10),px(12),'Bedroom','room');
+  createItem('room',60+px(24),60+px(12),px(10),px(10),'Bath','room');
+  setStatus('House template');
+};
+
+// ===== AUTH + CLOUD-LIKE SAVE =====
+let currentUser=null;
+const users=JSON.parse(localStorage.getItem('ff_users')||'{}');
+const designs=JSON.parse(localStorage.getItem('ff_designs')||'{}');
+
+function hash(s){
+  let h=0; for(let i=0;i<s.length;i++) h=(h<<5)-h+s.charCodeAt(i)|0;
+  return Math.abs(h).toString(36);
+}
+function saveUsers(){ localStorage.setItem('ff_users',JSON.stringify(users)); }
+function saveDesigns(){ localStorage.setItem('ff_designs',JSON.stringify(designs)); }
+
+function showAuthModal(mode='login'){
+  const existing=document.getElementById('authModal');
+  if(existing) existing.remove();
+  const m=document.createElement('div');
+  m.id='authModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center';
+  m.innerHTML=`
+    <div style="background:#1a1d24;padding:28px;border-radius:12px;width:340px;border:1px solid #2d3340">
+      <h2 style="margin:0 0 16px;font-size:20px">${mode==='login'?'Login':'Create Account'}</h2>
+      <input id="authEmail" placeholder="Email" style="width:100%;padding:10px;margin-bottom:10px;background:#252932;border:1px solid #3a4050;border-radius:6px;color:#fff">
+      <input id="authPass" type="password" placeholder="Password" style="width:100%;padding:10px;margin-bottom:16px;background:#252932;border:1px solid #3a4050;border-radius:6px;color:#fff">
+      <button id="authSubmit" style="width:100%;padding:10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">${mode==='login'?'Login':'Register'}</button>
+      <div style="margin-top:12px;text-align:center;font-size:13px">
+        <a href="#" id="authSwitch" style="color:#60a5fa">${mode==='login'?'Need an account? Register':'Have an account? Login'}</a>
+      </div>
+      <button id="authClose" style="margin-top:12px;width:100%;padding:8px;background:transparent;color:#9aa0a6;border:1px solid #3a4050;border-radius:6px;cursor:pointer">Cancel</button>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('authClose').onclick=()=>m.remove();
+  document.getElementById('authSwitch').onclick=e=>{ e.preventDefault(); showAuthModal(mode==='login'?'reg':'login'); };
+  document.getElementById('authSubmit').onclick=()=>{
+    const email=document.getElementById('authEmail').value.trim().toLowerCase();
+    const pass=document.getElementById('authPass').value;
+    if(!email||!pass){ alert('Enter email and password'); return; }
+    if(mode==='reg'){
+      if(users[email]){ alert('Account exists'); return; }
+      users[email]={hash:hash(pass),created:Date.now()};
+      saveUsers();
+      alert('Account created');
+      login(email);
+    } else {
+      if(!users[email]||users[email].hash!==hash(pass)){ alert('Wrong email or password'); return; }
+      login(email);
+    }
+    m.remove();
+  };
+}
+
+function login(email){
+  currentUser=email;
+  localStorage.setItem('ff_current',email);
+  document.getElementById('authBtn').textContent='Logout ('+email.split('@')[0]+')';
+  setStatus('Logged in as '+email);
+  showDesignList();
+}
+
+function logout(){
+  currentUser=null;
+  localStorage.removeItem('ff_current');
+  document.getElementById('authBtn').textContent='Login';
+  setStatus('Logged out');
+  const list=document.getElementById('designList'); if(list) list.remove();
+}
+
+function showDesignList(){
+  if(!currentUser) return;
+  let box=document.getElementById('designList');
+  if(!box){
+    box=document.createElement('div');
+    box.id='designList';
+    box.style.cssText='margin-top:16px;padding-top:12px;border-top:1px solid #2d3340';
+    document.querySelector('.sidebar').appendChild(box);
+  }
+  const mine=designs[currentUser]||[];
+  box.innerHTML='<h3>My Designs</h3>'+
+    (mine.length?mine.map((d,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0;font-size:13px">
+      <span style="cursor:pointer;color:#60a5fa" onclick="loadDesign(${i})">${d.name}</span>
+      <button onclick="deleteDesign(${i})" style="background:#b91c1c;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer">✕</button>
+    </div>`).join(''):'<div style="font-size:12px;color:#9aa0a6">No saved designs yet</div>')+
+    '<button id="saveAsBtn" style="width:100%;margin-top:8px;padding:8px;background:#252932;color:#fff;border:1px solid #3a4050;border-radius:6px;cursor:pointer">Save Current Design</button>';
+  document.getElementById('saveAsBtn').onclick=()=>{
+    const name=prompt('Design name','My Floor Plan')||'Untitled';
+    if(!designs[currentUser]) designs[currentUser]=[];
+    designs[currentUser].push({name,html:canvas.innerHTML,scale,unit,saved:Date.now()});
+    saveDesigns();
+    showDesignList();
+    setStatus('Saved: '+name);
+  };
+}
+window.loadDesign=function(i){
+  if(!currentUser||!designs[currentUser]||!designs[currentUser][i]) return;
+  const d=designs[currentUser][i];
+  canvas.innerHTML=d.html||'';
+  if(d.scale){ scale=d.scale; document.getElementById('scale').value=scale; }
+  if(d.unit){ unit=d.unit; document.getElementById('unit').value=unit; }
+  document.querySelectorAll('.item').forEach(bind);
+  setStatus('Loaded: '+d.name);
+};
+window.deleteDesign=function(i){
+  if(!currentUser||!confirm('Delete this design?')) return;
+  designs[currentUser].splice(i,1);
+  saveDesigns();
+  showDesignList();
+};
+
+document.getElementById('authBtn').onclick=()=>{
+  if(currentUser) logout();
+  else showAuthModal('login');
+};
+
+// restore session
+const savedUser=localStorage.getItem('ff_current');
+if(savedUser&&users[savedUser]) login(savedUser);
+
+createItem('room',100,100,px(16),px(12),'Living Room','room');
+setStatus('Ready — Login to save designs · Shift+click multi-select · Measure tool · Layers');
+</script>
+</body>
+</html>
