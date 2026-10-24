@@ -527,8 +527,9 @@ function showProps(){
   const h=toU(parseFloat(el.style.height));
   const locked=el.classList.contains('locked');
   const lab=el.querySelector('.label');
+  const rot=parseInt(el.dataset.rot||0);
   props.innerHTML=`
-    <strong>${el.dataset.type}</strong>
+    <strong style="color:#00f0ff">${el.dataset.type}</strong>
     <div style="display:flex;gap:10px;margin-top:8px">
       <div style="flex:1">
         <label style="display:block;margin-bottom:4px">Width (${unit})</label>
@@ -540,12 +541,26 @@ function showProps(){
       </div>
     </div>
     ${lab?`<label>Label</label><input type="text" value="${lab.textContent}" id="pL">`:''}
+    <label style="margin-top:10px">Rotation</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="rotL" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↺</button>
+      <input type="number" id="pRot" value="${rot}" step="15" style="flex:1;text-align:center">
+      <button id="rotR" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↻</button>
+    </div>
     <label style="margin-top:10px"><input type="checkbox" id="pLock" ${locked?'checked':''}> Locked</label>
-    ${el.dataset.type==='wall'?`<button id="splitThis" style="margin-top:8px;width:100%;background:#aa00ff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Split This Wall</button>
+    ${el.dataset.type==='room'?`<div style="margin-top:10px"><label>Remove wall</label><div style="display:flex;gap:4px;margin-top:4px"><button class="rmW" data-s="top" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Top</button><button class="rmW" data-s="bottom" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Bot</button><button class="rmW" data-s="left" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Left</button><button class="rmW" data-s="right" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Right</button></div></div>`:''}
+    ${el.dataset.type==='wall'?`<button id="splitThis" style="margin-top:8px;width:100%;background:#aa00ff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Split Wall</button>
     <button id="addDoorWall" style="margin-top:6px;width:100%;background:#ffaa00;color:#000;border:none;padding:8px;border-radius:6px;cursor:pointer;font-weight:600">Add Door</button>
     <button id="addWinWall" style="margin-top:6px;width:100%;background:#00aaff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Add Window</button>`:''}
-    <button id="del" style="margin-top:12px;width:100%;background:#b91c1c;border:none;padding:8px;color:#fff;border-radius:6px;cursor:pointer">Delete</button>
+    <button id="cloneThis" style="margin-top:8px;width:100%;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;padding:8px;border-radius:6px;cursor:pointer">Clone</button>
+    <button id="del" style="margin-top:8px;width:100%;background:#b91c1c;border:none;padding:8px;color:#fff;border-radius:6px;cursor:pointer">Delete</button>
   `;
+  const setRot=deg=>{
+    el.dataset.rot=deg;
+    el.style.transform=`rotate(${deg}deg)`;
+    el.style.transformOrigin='center';
+    saveState();
+  };
   document.getElementById('pW').onchange=e=>{
     const feet=fromU(+e.target.value);
     el.style.width=px(feet)+'px';
@@ -558,6 +573,16 @@ function showProps(){
     el.dataset.feetH=feet;
     updateDims(el); saveState();
   };
+  document.getElementById('rotL').onclick=()=>setRot((rot-15+360)%360);
+  document.getElementById('rotR').onclick=()=>setRot((rot+15)%360);
+  document.getElementById('pRot').onchange=e=>setRot(+e.target.value||0);
+  document.getElementById('cloneThis').onclick=()=>document.getElementById('cloneBtn').click();
+  props.querySelectorAll('.rmW').forEach(b=>b.onclick=()=>{
+    const side=b.dataset.s;
+    const map={top:'borderTop',bottom:'borderBottom',left:'borderLeft',right:'borderRight'};
+    el.style[map[side]]=el.style[map[side]]==='none'?'':'none';
+    saveState();
+  });
   if(lab) document.getElementById('pL').onchange=e=>{lab.textContent=e.target.value; saveState();};
   document.getElementById('pLock').onchange=e=>el.classList.toggle('locked',e.target.checked);
   if(el.dataset.type==='wall'){
