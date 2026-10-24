@@ -262,16 +262,66 @@ function bind(el){
     }
     select(el);
     if(el.classList.contains('locked')) return;
-    drag={el, sx:e.clientX, sy:e.clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), multi:[...selectedSet]};
+    drag={el, sx:e.clientX, sy:e.clientY, ox:parseFloat(el.style.left), oy:parseFloat(el.style.top), multi:[...selectedSet], merged:el.dataset.merged?[...document.querySelectorAll(`.item[data-id="${el.dataset.merged}"], .item[data-merged="${el.dataset.merged}"]`)] : []};
     el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('dblclick',e=>{
+    e.stopPropagation();
+    if(el.dataset.type==='wall'){
+      cycleWallSelect(el);
+      return;
+    }
     const l=el.querySelector('.label');
     if(l){
       const n=prompt('Label',l.textContent);
       if(n!=null){l.textContent=n; saveState();}
     }
   });
+}
+let wallCycle=0;
+function cycleWallSelect(wall){
+  wallCycle=(wallCycle+1)%4;
+  selectedSet.forEach(s=>s.classList.remove('multi-selected','selected'));
+  selectedSet.clear();
+  const walls=[...document.querySelectorAll('.item.wall')];
+  const wx=parseFloat(wall.style.left), wy=parseFloat(wall.style.top);
+  const ww=parseFloat(wall.style.width), wh=parseFloat(wall.style.height);
+  const angle=wall.style.transform||'';
+  if(wallCycle===0){
+    select(wall);
+    setStatus('Wall segment');
+  } else if(wallCycle===1){
+    // joint: walls that share an endpoint
+    walls.forEach(w=>{
+      const ox=parseFloat(w.style.left), oy=parseFloat(w.style.top);
+      const ow=parseFloat(w.style.width);
+      const near=(Math.abs(wx-ox)<20&&Math.abs(wy-oy)<20)||
+                 (Math.abs(wx+ww-(ox+ow))<20&&Math.abs(wy-oy)<20)||
+                 (Math.abs(wx-(ox+ow))<20)||(Math.abs(wx+ww-ox)<20);
+      if(near){ w.classList.add('multi-selected'); selectedSet.add(w); }
+    });
+    selected=wall;
+    setStatus('Joint selected');
+  } else if(wallCycle===2){
+    // whole run: same angle walls
+    walls.forEach(w=>{
+      if((w.style.transform||'')===angle){ w.classList.add('multi-selected'); selectedSet.add(w); }
+    });
+    selected=wall;
+    setStatus('Whole wall run');
+  } else {
+    // attached: doors/windows near the wall
+    selectedSet.add(wall); wall.classList.add('multi-selected');
+    document.querySelectorAll('.item.door,.item.window').forEach(d=>{
+      const dx=parseFloat(d.style.left), dy=parseFloat(d.style.top);
+      if(Math.abs(dx-wx)<ww+30 && Math.abs(dy-wy)<40){
+        d.classList.add('multi-selected'); selectedSet.add(d);
+      }
+    });
+    selected=wall;
+    setStatus('Wall + attached');
+  }
+  showProps();
 }
 
 function startResize(e,el){
@@ -310,9 +360,49 @@ document.addEventListener('pointermove',e=>{
         m.style.top=Math.round(my/snap())*snap()+'px';
       });
     }
+    if(drag.merged && drag.merged.length){
+      drag.merged.forEach(m=>{
+        if(m===drag.el) return;
+        const mx=parseFloat(m.style.left)+ (x-drag.ox);
+        const my=parseFloat(m.style.top)+ (y-drag.oy);
+        m.style.left=Math.round(mx/snap())*snap()+'px';
+        m.style.top=Math.round(my/snap())*snap()+'px';
+      });
+    }
   }
 });
-document.addEventListener('pointerup',()=>{ if(drag){drag=null; saveState();} });
+document.addEventListener('pointerup',()=>{
+  if(drag){
+    const el=drag.el;
+    drag=null;
+    saveState();
+    if(el.dataset.type==='room') tryMerge(el);
+  }
+});
+function tryMerge(el){
+  const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
+  const w=parseFloat(el.style.width), h=parseFloat(el.style.height);
+  const thresh=scale()*0.5;
+  document.querySelectorAll('.item.room').forEach(o=>{
+    if(o===el) return;
+    const ox=parseFloat(o.style.left), oy=parseFloat(o.style.top);
+    const ow=parseFloat(o.style.width), oh=parseFloat(o.style.height);
+    const sharesEdge=
+      (Math.abs(x-(ox+ow))<thresh && y<oy+oh && y+h>oy) ||
+      (Math.abs((x+w)-ox)<thresh && y<oy+oh && y+h>oy) ||
+      (Math.abs(y-(oy+oh))<thresh && x<ox+ow && x+w>ox) ||
+      (Math.abs((y+h)-oy)<thresh && x<ox+ow && x+w>ox);
+    if(sharesEdge && confirm('Merge these into one room?')){
+      const label=el.querySelector('.label')?.textContent||'Room';
+      o.querySelector('.label').textContent=label;
+      el.dataset.merged=o.dataset.id||'1';
+      o.dataset.merged=el.dataset.id||'1';
+      el.classList.add('merged');
+      o.classList.add('merged');
+      setStatus('Merged — drag either piece to move both');
+    }
+  });
+}
 
 function select(el){
   selectedSet.forEach(s=>s.classList.remove('multi-selected'));
@@ -414,7 +504,33 @@ function setActive(id){
 }
 
 let wallStart=null;
+document.addEventListener('keydown',e=>{
+  if(e.key==='Delete'||e.key==='Backspace'){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+    e.preventDefault();
+    if(selectedSet.size){
+      selectedSet.forEach(el=>el.remove());
+      selectedSet.clear();
+      selected=null;
+      showProps();
+      saveState();
+      setStatus('Deleted');
+    }
+  }
+  if(e.key==='Escape'){
+    selectedSet.forEach(s=>s.classList.remove('multi-selected','selected'));
+    selectedSet.clear();
+    selected=null;
+    showProps();
+  }
+});
 canvas.addEventListener('pointerdown',e=>{
+  if(e.target===canvas){
+    selectedSet.forEach(s=>s.classList.remove('multi-selected','selected'));
+    selectedSet.clear();
+    selected=null;
+    showProps();
+  }
   if(e.target!==canvas) return;
   const rect=canvas.getBoundingClientRect();
   const x=e.clientX-rect.left+wrap.scrollLeft;
