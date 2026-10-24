@@ -57,6 +57,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
   .toolbar button,.toolbar select,.toolbar input{flex-shrink:0;padding:10px 14px;font-size:14px}
   .sidebar{position:fixed;top:0;left:0;height:100%;width:280px;z-index:100;transform:translateX(-100%);transition:transform .25s;box-shadow:10px 0 30px #000}
   .sidebar.open{transform:translateX(0)}
+  .sidebar-close{display:block!important}
   .canvas-wrap{width:100%}
   #status{left:10px;bottom:10px;font-size:11px}
   .resize-handle{width:22px;height:22px}
@@ -96,6 +97,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
 </header>
 <div class="main">
   <div class="sidebar">
+    <button class="sidebar-close" id="sidebarClose" style="display:none;width:100%;padding:10px;margin-bottom:10px;background:#ff00aa;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600">✕ Close</button>
     <h3>Symbols</h3>
     <div class="symbol-grid">
       <div class="symbol-btn" data-type="door">🚪 Door</div>
@@ -847,9 +849,18 @@ if(savedUser&&users[savedUser]) login(savedUser);
 document.getElementById('menuToggle').onclick=()=>{
   document.querySelector('.sidebar').classList.toggle('open');
 };
+document.getElementById('sidebarClose').onclick=()=>{
+  document.querySelector('.sidebar').classList.remove('open');
+};
+document.addEventListener('click',e=>{
+  if(window.innerWidth>800) return;
+  const sb=document.querySelector('.sidebar');
+  if(!sb.classList.contains('open')) return;
+  if(!sb.contains(e.target)&&e.target.id!=='menuToggle') sb.classList.remove('open');
+});
 document.querySelectorAll('.symbol-btn,.sidebar button').forEach(el=>{
   el.addEventListener('click',()=>{
-    if(window.innerWidth<=800) document.querySelector('.sidebar').classList.remove('open');
+    if(window.innerWidth<=800 && el.id!=='sidebarClose') document.querySelector('.sidebar').classList.remove('open');
   });
 });
 createItem('room',100,100,px(16),px(12),'Living Room','room');
