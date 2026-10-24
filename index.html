@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600&display=swap');
 :root { --bg:#050510; --panel:#0a0a18; --accent:#00f0ff; --accent2:#ff00aa; --border:#1a1a3a; --text:#e0e0ff; --muted:#7a7aaa; --glow:0 0 10px #00f0ff, 0 0 20px #00f0ff40; }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Rajdhani',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;background-image:radial-gradient(ellipse at top,#1a0a2a 0%,transparent 50%),linear-gradient(180deg,#050510 0%,#0a0515 100%)}
+body{font-family:'Rajdhani',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;background-image:radial-gradient(ellipse at top,#1a0a2a 0%,transparent 50%),linear-gradient(180deg,#050510 0%,#0a0515 100%);touch-action:manipulation}
 header{background:linear-gradient(90deg,#0a0a18,#12122a);padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #00f0ff40;flex-shrink:0;box-shadow:0 2px 20px #00f0ff20}
 header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;color:#00f0ff;text-shadow:var(--glow)}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -48,10 +48,27 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
 .layer-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px}
 .measure-line{position:absolute;background:#ffee00;height:2px;pointer-events:none;z-index:5;box-shadow:0 0 6px #ffee00}
 .measure-label{position:absolute;background:#0a0a18;color:#ffee00;padding:2px 6px;border-radius:4px;font-size:11px;pointer-events:none;z-index:6;border:1px solid #ffee00}
+.mobile-menu{display:none;background:#0d0d20;border:1px solid #00f0ff50;color:#00f0ff;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:18px}
+@media(max-width:800px){
+  .mobile-menu{display:block}
+  header{flex-wrap:wrap;padding:8px}
+  header h1{font-size:13px;letter-spacing:1px}
+  .toolbar{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+  .toolbar button,.toolbar select,.toolbar input{flex-shrink:0;padding:10px 14px;font-size:14px}
+  .sidebar{position:fixed;top:0;left:0;height:100%;width:280px;z-index:100;transform:translateX(-100%);transition:transform .25s;box-shadow:10px 0 30px #000}
+  .sidebar.open{transform:translateX(0)}
+  .canvas-wrap{width:100%}
+  #status{left:10px;bottom:10px;font-size:11px}
+  .resize-handle{width:22px;height:22px}
+  .resize-handle.br{right:-11px;bottom:-11px}
+  .symbol-btn{padding:12px 6px;font-size:13px}
+  .info{font-size:13px}
+}
 </style>
 </head>
 <body>
 <header>
+  <button class="mobile-menu" id="menuToggle">☰</button>
   <h1>⚡ ADHD FLOORFLOW</h1>
   <div class="toolbar">
     <button id="modeSelect" class="active">Select</button>
@@ -783,6 +800,14 @@ document.getElementById('authBtn').onclick=()=>{
 const savedUser=localStorage.getItem('ff_current');
 if(savedUser&&users[savedUser]) login(savedUser);
 
+document.getElementById('menuToggle').onclick=()=>{
+  document.querySelector('.sidebar').classList.toggle('open');
+};
+document.querySelectorAll('.symbol-btn,.sidebar button').forEach(el=>{
+  el.addEventListener('click',()=>{
+    if(window.innerWidth<=800) document.querySelector('.sidebar').classList.remove('open');
+  });
+});
 createItem('room',100,100,px(16),px(12),'Living Room','room');
 setStatus('Ready — Login to save designs · Shift+click multi-select · Measure tool · Layers');
 </script>
