@@ -75,6 +75,9 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
     <button id="modeWall">Draw Wall</button>
     <button id="modeMeasure">Measure</button>
     <button id="addRoom">+ Room</button>
+    <button id="cloneBtn">Clone</button>
+    <button id="shapeL">L-Shape</button>
+    <button id="shapeV">V-Shape</button>
     <input id="quickRoom" placeholder="Type size: 12x15 or 144x180" style="width:160px" title="Type width x depth then Enter to create room">
     <button id="mode2d" class="active">2D Plan</button>
     <button id="mode3d">3D View</button>
@@ -482,6 +485,31 @@ document.querySelectorAll('.symbol-btn').forEach(btn=>{
 });
 
 document.getElementById('addRoom').onclick=()=>createItem('room',100,100,px(14),px(12),'Room','room');
+document.getElementById('cloneBtn').onclick=()=>{
+  if(!selected){ setStatus('Select a room first'); return; }
+  const el=selected;
+  const x=parseFloat(el.style.left)+30;
+  const y=parseFloat(el.style.top)+30;
+  const w=parseFloat(el.style.width);
+  const h=parseFloat(el.style.height);
+  const label=el.querySelector('.label')?.textContent||'Room';
+  const type=el.dataset.type;
+  const layer=el.dataset.layer||'room';
+  createItem(type,x,y,w,h,label+' copy',layer);
+  setStatus('Cloned');
+};
+document.getElementById('shapeL').onclick=()=>{
+  const x=100, y=100;
+  const main=createItem('room',x,y,px(16),px(12),'L Main','room');
+  const wing=createItem('room',x,y+px(12),px(8),px(10),'L Wing','room');
+  setStatus('L-Shape created — drag segments to adjust');
+};
+document.getElementById('shapeV').onclick=()=>{
+  const x=120, y=100;
+  createItem('room',x,y,px(10),px(14),'V Left','room');
+  createItem('room',x+px(10),y+px(6),px(12),px(8),'V Right','room');
+  setStatus('V-Shape created — drag to form the corner');
+};
 document.getElementById('quickRoom').onkeydown=e=>{
   if(e.key!=='Enter') return;
   const raw=e.target.value.trim();
