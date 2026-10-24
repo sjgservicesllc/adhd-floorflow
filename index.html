@@ -274,7 +274,13 @@ function bind(el){
     openConfig(el);
   });
 }
-function openConfig(el){
+function applyRemovedWalls(el){
+  const removed=(el.dataset.removedWalls||'').split(',').filter(Boolean);
+  el.style.borderTop=removed.includes('top')?'none':'';
+  el.style.borderBottom=removed.includes('bottom')?'none':'';
+  el.style.borderLeft=removed.includes('left')?'none':'';
+  el.style.borderRight=removed.includes('right')?'none':'';
+}
   const old=document.getElementById('configModal'); if(old) old.remove();
   const w=toU(parseFloat(el.style.width));
   const h=toU(parseFloat(el.style.height));
@@ -298,12 +304,27 @@ function openConfig(el){
         </div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;color:#7a7aaa"><input type="checkbox" id="cfgLock" ${el.classList.contains('locked')?'checked':''}> Locked</label>
+      ${el.dataset.type==='room'?`<div style="margin-bottom:12px"><label style="color:#7a7aaa;display:block;margin-bottom:6px">Remove a wall</label><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="wallBtn" data-side="top" style="padding:6px 10px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">Top</button><button type="button" class="wallBtn" data-side="bottom" style="padding:6px 10px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">Bottom</button><button type="button" class="wallBtn" data-side="left" style="padding:6px 10px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">Left</button><button type="button" class="wallBtn" data-side="right" style="padding:6px 10px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">Right</button></div></div>`:''}
       <div style="display:flex;gap:8px">
         <button id="cfgSave" style="flex:1;padding:10px;background:#00f0ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:600">Save</button>
         <button id="cfgCancel" style="flex:1;padding:10px;background:transparent;color:#7a7aaa;border:1px solid #3a4050;border-radius:4px;cursor:pointer">Cancel</button>
       </div>
     </div>`;
   document.body.appendChild(m);
+  m.querySelectorAll('.wallBtn').forEach(btn=>{
+    btn.onclick=()=>{
+      const side=btn.dataset.side;
+      const removed=el.dataset.removedWalls||'';
+      if(removed.includes(side)){
+        el.dataset.removedWalls=removed.replace(side,'').replace(',,',',').replace(/^,|,$/g,'');
+        btn.style.opacity='1';
+      } else {
+        el.dataset.removedWalls=(removed?removed+',':'')+side;
+        btn.style.opacity='.4';
+      }
+      applyRemovedWalls(el);
+    };
+  });
   document.getElementById('cfgCancel').onclick=()=>m.remove();
   document.getElementById('cfgSave').onclick=()=>{
     const newLab=document.getElementById('cfgLabel').value;
