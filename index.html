@@ -157,7 +157,7 @@ const canvas=document.getElementById('canvas');
 const wrap=document.getElementById('wrap');
 const props=document.getElementById('props');
 const statusEl=document.getElementById('status');
-let zoom=100, unit='ft', selected=null, selectedSet=new Set(), drag=null, mode='select';
+let zoom=100, unit='in', selected=null, selectedSet=new Set(), drag=null, mode='select';
 let history=[], id=1, measureStart=null;
 const BASE=20; // pixels per foot at 100% zoom
 function scale(){ return BASE*(zoom/100); }
