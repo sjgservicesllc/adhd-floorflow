@@ -19,6 +19,7 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
 .drop-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;color:#e0e0ff;padding:8px 12px;cursor:pointer;border-radius:4px;font-size:13px}
 .drop-menu button:hover{background:#1a0a20;color:#00f0ff}
 .drop-menu button.active{color:#00f0ff}
+.toolbar button,.toolbar select,.toolbar input{background:#0d0d20;color:var(--text);border:1px solid #00f0ff50;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit}
 .toolbar button:hover{background:#151530;border-color:#00f0ff;box-shadow:0 0 8px #00f0ff40}
 .toolbar button.active{background:linear-gradient(180deg,#00f0ff,#0088aa);color:#000;border-color:#00f0ff;font-weight:600;text-shadow:none}
 .main{display:flex;flex:1;overflow:hidden}
@@ -1172,14 +1173,21 @@ if(savedUser&&users[savedUser]) login(savedUser);
 
 document.querySelectorAll('.drop-btn').forEach(btn=>{
   btn.onclick=e=>{
+    e.preventDefault();
     e.stopPropagation();
     const d=btn.parentElement;
-    document.querySelectorAll('.drop').forEach(x=>x!==d&&x.classList.remove('open'));
-    d.classList.toggle('open');
+    const wasOpen=d.classList.contains('open');
+    document.querySelectorAll('.drop').forEach(x=>x.classList.remove('open'));
+    if(!wasOpen) d.classList.add('open');
   };
 });
-document.addEventListener('click',()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')));
-document.querySelectorAll('.drop-menu button').forEach(b=>b.onclick=()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')));
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.drop')) document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open'));
+});
+document.querySelectorAll('.drop-menu button').forEach(b=>{
+  const old=b.onclick;
+  b.addEventListener('click',()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')));
+});
 document.getElementById('menuToggle').onclick=()=>{
   document.querySelector('.sidebar').classList.toggle('open');
 };
