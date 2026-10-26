@@ -12,7 +12,13 @@ body{font-family:'Rajdhani',system-ui,sans-serif;background:var(--bg);color:var(
 header{background:linear-gradient(90deg,#0a0a18,#12122a);padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #00f0ff40;flex-shrink:0;box-shadow:0 2px 20px #00f0ff20}
 header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;color:#00f0ff;text-shadow:var(--glow)}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.toolbar button,.toolbar select,.toolbar input{background:#0d0d20;color:var(--text);border:1px solid #00f0ff50;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s}
+.drop{position:relative;display:inline-block}
+.drop-btn{background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff50;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:13px}
+.drop-menu{display:none;position:absolute;top:100%;left:0;background:#0a0a18;border:1px solid #00f0ff40;border-radius:6px;min-width:140px;z-index:50;padding:4px;box-shadow:0 4px 20px #000}
+.drop.open .drop-menu{display:block}
+.drop-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;color:#e0e0ff;padding:8px 12px;cursor:pointer;border-radius:4px;font-size:13px}
+.drop-menu button:hover{background:#1a0a20;color:#00f0ff}
+.drop-menu button.active{color:#00f0ff}
 .toolbar button:hover{background:#151530;border-color:#00f0ff;box-shadow:0 0 8px #00f0ff40}
 .toolbar button.active{background:linear-gradient(180deg,#00f0ff,#0088aa);color:#000;border-color:#00f0ff;font-weight:600;text-shadow:none}
 .main{display:flex;flex:1;overflow:hidden}
@@ -72,30 +78,50 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
   <button class="mobile-menu" id="menuToggle">☰</button>
   <h1>⚡ ADHD FLOORFLOW</h1>
   <div class="toolbar">
-    <button id="modeSelect" class="active">Select</button>
-    <button id="modeMulti">Multi</button>
-    <button id="modeWall">Draw Wall</button>
-    <button id="splitWall">Split Wall</button>
-    <button id="modeMeasure">Measure</button>
-    <button id="addRoom">+ Room</button>
-    <button id="cloneBtn">Clone</button>
-    <button id="mergeBtn">Merge</button>
-    <button id="shapeL">L-Shape</button>
-    <button id="shapeV">V-Shape</button>
-    <input id="quickRoom" placeholder="Type size: 12x15 or 144x180" style="width:160px" title="Type width x depth then Enter to create room">
-    <button id="mode2d" class="active">2D Plan</button>
-    <button id="mode3d">3D View</button>
-    <button id="wireCalc">Wire Est.</button>
-    <button id="saveBtn">Save Layout</button>
-    <button id="openBtn">Open Saved</button>
-    <button id="authBtn" style="background:#3b82f6;margin-left:8px">Login</button>
-    <button id="exportBtn">Export PNG</button>
-    <select id="unit"><option value="ft">Feet</option><option value="in">Inches</option><option value="m">Meters</option></select>
-    <label style="font-size:13px">Wall H <input type="number" id="wallH" value="96" min="72" max="144" style="width:52px"> in</label>
-    <label style="font-size:13px">Zoom <input type="number" id="zoom" value="100" min="20" max="400" style="width:56px"> %</label>
-    <button id="zoomFit">Fit</button>
-    <button id="undoBtn">Undo</button>
-    <button id="clearBtn">Clear</button>
+    <div class="drop">
+      <button class="drop-btn">Tools ▾</button>
+      <div class="drop-menu">
+        <button id="modeSelect" class="active">Select</button>
+        <button id="modeMulti">Multi Select</button>
+        <button id="modeWall">Draw Wall</button>
+        <button id="splitWall">Split Wall</button>
+        <button id="modeMeasure">Measure</button>
+      </div>
+    </div>
+    <div class="drop">
+      <button class="drop-btn">Rooms ▾</button>
+      <div class="drop-menu">
+        <button id="addRoom">+ Room</button>
+        <button id="shapeL">L-Shape</button>
+        <button id="shapeV">V-Shape</button>
+        <button id="cloneBtn">Clone</button>
+        <button id="mergeBtn">Merge</button>
+      </div>
+    </div>
+    <input id="quickRoom" placeholder="12x15" style="width:90px" title="Type size then Enter">
+    <div class="drop">
+      <button class="drop-btn">View ▾</button>
+      <div class="drop-menu">
+        <button id="mode2d" class="active">2D Plan</button>
+        <button id="mode3d">3D View</button>
+        <button id="zoomFit">Fit</button>
+      </div>
+    </div>
+    <div class="drop">
+      <button class="drop-btn">File ▾</button>
+      <div class="drop-menu">
+        <button id="saveBtn">Save Layout</button>
+        <button id="openBtn">Open Saved</button>
+        <button id="exportBtn">Export PNG</button>
+        <button id="undoBtn">Undo</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+    </div>
+    <button id="wireCalc">Wire</button>
+    <button id="authBtn">Login</button>
+    <select id="unit"><option value="in" selected>In</option><option value="ft">Ft</option><option value="m">M</option></select>
+    <label style="font-size:13px">H <input type="number" id="wallH" value="96" min="72" max="144" style="width:48px">in</label>
+    <label style="font-size:13px">Z <input type="number" id="zoom" value="100" min="20" max="400" style="width:48px">%</label>
   </div>
 </header>
 <div class="main">
@@ -1144,6 +1170,16 @@ document.getElementById('authBtn').onclick=()=>{
 const savedUser=localStorage.getItem('ff_current');
 if(savedUser&&users[savedUser]) login(savedUser);
 
+document.querySelectorAll('.drop-btn').forEach(btn=>{
+  btn.onclick=e=>{
+    e.stopPropagation();
+    const d=btn.parentElement;
+    document.querySelectorAll('.drop').forEach(x=>x!==d&&x.classList.remove('open'));
+    d.classList.toggle('open');
+  };
+});
+document.addEventListener('click',()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')));
+document.querySelectorAll('.drop-menu button').forEach(b=>b.onclick=()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')));
 document.getElementById('menuToggle').onclick=()=>{
   document.querySelector('.sidebar').classList.toggle('open');
 };
