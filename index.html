@@ -35,7 +35,8 @@ header h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;lette
 .outlet{width:18px;height:18px;background:#ffee00;border-radius:50%;border:2px solid #ffaa00;transform:translate(-50%,-50%);box-shadow:0 0 10px #ffee00}
 .outlet::after{content:'⚡';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px}
 .panel{background:#0a1a3a;border:2px solid #00f0ff;border-radius:4px;box-shadow:0 0 12px #00f0ff}
-.label{position:absolute;top:6px;left:6px;font-size:12px;font-weight:600;pointer-events:none;color:#00f0ff;text-shadow:0 0 4px #00f0ff}
+.label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:14px;font-weight:600;pointer-events:auto;cursor:move;color:#00f0ff;text-shadow:0 0 4px #00f0ff;white-space:nowrap;z-index:3}
+.icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28px;pointer-events:none;opacity:.85}
 .dims{position:absolute;bottom:4px;right:4px;font-size:11px;color:#ff00aa;pointer-events:none;text-shadow:0 0 4px #ff00aa}
 .resize-handle{position:absolute;width:14px;height:14px;background:#ff00aa;border-radius:2px;cursor:nwse-resize;z-index:2;box-shadow:0 0 8px #ff00aa}
 .resize-handle.br{right:-7px;bottom:-7px}
@@ -234,6 +235,13 @@ function createItem(type,x,y,w,h,label='',layer='furniture'){
     l.textContent=label;
     el.appendChild(l);
   }
+  const icons={toilet:'🚽',sink:'🚰',tub:'🛁',bed:'🛏️',sofa:'🛋️',desk:'🖥️',table:'🪑',chair:'🪑',washer:'🧺',dryer:'🧺',stove:'🔥',fridge:'🧊',panel:'⚡',garage:'🚗'};
+  if(icons[type]){
+    const ic=document.createElement('div');
+    ic.className='icon';
+    ic.textContent=icons[type];
+    el.appendChild(ic);
+  }
   const d=document.createElement('div');
   d.className='dims';
   el.appendChild(d);
@@ -284,6 +292,21 @@ function updateDims(el){
 
 function bind(el){
   el.addEventListener('pointerdown',e=>{
+    if(e.target.classList.contains('label')){
+      e.stopPropagation();
+      const lab=e.target;
+      const sx=e.clientX, sy=e.clientY;
+      const ox=parseFloat(lab.style.left)||50, oy=parseFloat(lab.style.top)||50;
+      lab.style.transform='none';
+      const move=ev=>{
+        lab.style.left=(ox+(ev.clientX-sx))+'px';
+        lab.style.top=(oy+(ev.clientY-sy))+'px';
+      };
+      const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); saveState(); };
+      document.addEventListener('pointermove',move);
+      document.addEventListener('pointerup',up);
+      return;
+    }
     if(e.target.classList.contains('resize-handle')) return startResize(e,el);
     if(mode==='wall'||mode==='measure') return;
     if(e.shiftKey || mode==='multi'){
@@ -544,10 +567,17 @@ function showProps(){
     ${lab?`<label>Label</label><input type="text" value="${lab.textContent}" id="pL">`:''}
     <label style="margin-top:10px">Rotation</label>
     <div style="display:flex;gap:6px;align-items:center">
-      <button id="rotL" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↺</button>
+      <button id="rotL" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↺ 15°</button>
       <input type="number" id="pRot" value="${rot}" step="15" style="flex:1;text-align:center">
-      <button id="rotR" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↻</button>
+      <button id="rotR" style="padding:6px 12px;background:#1a0a20;color:#ff00aa;border:1px solid #ff00aa40;border-radius:4px;cursor:pointer">↻ 15°</button>
     </div>
+    <label style="margin-top:10px">Colors</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="flex:1"><label style="font-size:11px">Fill</label><input type="color" id="pFill" value="${rgbToHex(el.style.backgroundColor)||'#0a1a2a'}" style="width:100%;height:28px;border:none;cursor:pointer"></div>
+      <div style="flex:1"><label style="font-size:11px">Border</label><input type="color" id="pBorder" value="${rgbToHex(el.style.borderColor)||'#00f0ff'}" style="width:100%;height:28px;border:none;cursor:pointer"></div>
+      <div style="flex:1"><label style="font-size:11px">Text</label><input type="color" id="pText" value="${lab?rgbToHex(lab.style.color)||'#00f0ff':'#00f0ff'}" style="width:100%;height:28px;border:none;cursor:pointer"></div>
+    </div>
+    ${lab?`<label>Text size</label><input type="number" id="pTextSize" value="${parseInt(lab.style.fontSize)||14}" min="8" max="48" style="width:60px">`:''}
     <label style="margin-top:10px"><input type="checkbox" id="pLock" ${locked?'checked':''}> Locked</label>
     ${el.dataset.type==='room'?`<div style="margin-top:10px"><label>Remove wall</label><div style="display:flex;gap:4px;margin-top:4px"><button class="rmW" data-s="top" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Top</button><button class="rmW" data-s="bottom" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Bot</button><button class="rmW" data-s="left" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Left</button><button class="rmW" data-s="right" style="flex:1;padding:6px;background:#0d0d20;color:#00f0ff;border:1px solid #00f0ff40;border-radius:4px;cursor:pointer">Right</button></div></div>`:''}
     ${el.dataset.type==='wall'?`<button id="splitThis" style="margin-top:8px;width:100%;background:#aa00ff;color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer">Split Wall</button>
@@ -574,7 +604,17 @@ function showProps(){
     el.dataset.feetH=feet;
     updateDims(el); saveState();
   };
-  document.getElementById('rotL').onclick=()=>setRot((rot-15+360)%360);
+function rgbToHex(c){
+  if(!c||c.startsWith('#')) return c||'';
+  const m=c.match(/\d+/g); if(!m) return '#00f0ff';
+  return '#'+m.slice(0,3).map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+}
+  document.getElementById('pFill').oninput=e=>{ el.style.background=e.target.value+'33'; saveState(); };
+  document.getElementById('pBorder').oninput=e=>{ el.style.borderColor=e.target.value; saveState(); };
+  if(lab){
+    document.getElementById('pText').oninput=e=>{ lab.style.color=e.target.value; lab.style.textShadow='0 0 4px '+e.target.value; saveState(); };
+    document.getElementById('pTextSize').onchange=e=>{ lab.style.fontSize=e.target.value+'px'; saveState(); };
+  }
   document.getElementById('rotR').onclick=()=>setRot((rot+15)%360);
   document.getElementById('pRot').onchange=e=>setRot(+e.target.value||0);
   document.getElementById('cloneThis').onclick=()=>document.getElementById('cloneBtn').click();
